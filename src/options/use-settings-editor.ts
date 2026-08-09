@@ -17,17 +17,12 @@ export const useSettingsEditor = () => {
   const [editor, setEditor] = useState<EditorState>(() => createEditorState())
   const editorRef = useRef(editor)
   const dispatchRef = useRef<((event: EditorEvent) => void) | null>(null)
-  const statusTimerRef = useRef<number | null>(null)
 
   const persist = useCallback(
     async (settings: EditorState['settings']): Promise<void> => {
       try {
         await updateSettings(settings)
         dispatchRef.current?.({ type: 'save-succeeded' })
-        if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current)
-        statusTimerRef.current = window.setTimeout(() => {
-          dispatchRef.current?.({ type: 'save-status-auto' })
-        }, 1600)
       } catch {
         dispatchRef.current?.({ type: 'save-failed' })
       }
@@ -68,13 +63,6 @@ export const useSettingsEditor = () => {
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [dispatch, editor.recordingAction])
-
-  useEffect(
-    () => () => {
-      if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current)
-    },
-    []
-  )
 
   return {
     settings: editor.settings,

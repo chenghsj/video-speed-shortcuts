@@ -20,9 +20,9 @@ export const HOLD_FIELDS = [
 ] as const
 
 export type NumberFieldId = (typeof NUMBER_FIELDS)[number]['id'] | (typeof HOLD_FIELDS)[number]['id']
-export type EditorStatusKey = 'autoSave' | 'saved' | 'saveFailed'
+export type EditorStatusKey = 'autoSave' | 'saveFailed'
 export type EditorErrorKey = 'invalid' | 'duplicate'
-export type EditorSection = 'enabled' | 'quickControls' | 'shortcuts' | 'blockedSites' | 'appearance'
+export type EditorSection = 'quickControls' | 'shortcuts' | 'blockedSites' | 'appearance'
 
 export type EditorState = {
   settings: VideoSpeedSettings
@@ -48,7 +48,6 @@ export type EditorEvent =
   | { type: 'remove-blacklist'; host: string }
   | { type: 'save-succeeded' }
   | { type: 'save-failed' }
-  | { type: 'save-status-auto' }
   | { type: 'reset-section'; section: EditorSection }
 
 export type EditorEffect = { type: 'save'; settings: VideoSpeedSettings }
@@ -177,15 +176,11 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
         blacklist: state.settings.blacklist.filter(entry => entry.host !== event.host),
       })
     case 'save-succeeded':
-      return { state: { ...state, statusKey: 'saved' } }
+      return { state: { ...state, statusKey: 'autoSave' } }
     case 'save-failed':
       return { state: { ...state, statusKey: 'saveFailed' } }
-    case 'save-status-auto':
-      return { state: { ...state, statusKey: 'autoSave' } }
     case 'reset-section': {
       switch (event.section) {
-        case 'enabled':
-          return save(state, { ...state.settings, enabled: DEFAULT_SETTINGS.enabled })
         case 'quickControls':
           return save(state, {
             ...state.settings,

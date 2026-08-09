@@ -43,6 +43,11 @@ const createMemoryStorage = (initial: unknown = undefined, blockFirstWrite = fal
 }
 
 describe('normalizeSettings', () => {
+  it('defaults language and theme to automatic', () => {
+    expect(DEFAULT_SETTINGS.locale).toBe('auto')
+    expect(DEFAULT_SETTINGS.theme).toBe('system')
+  })
+
   it('uses product defaults for missing settings', () => {
     expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS)
   })

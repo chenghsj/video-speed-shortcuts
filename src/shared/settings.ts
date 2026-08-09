@@ -1,5 +1,4 @@
 import { DEFAULT_BINDINGS } from './keys'
-import { getDefaultLocale } from './i18n'
 import { normalizeHostname } from './site-matching'
 import {
   LOCALES,
@@ -22,7 +21,7 @@ export const DEFAULT_SETTINGS: VideoSpeedSettings = {
   holdSpeed: 2,
   holdDelayMs: 250,
   showIndicator: true,
-  locale: getDefaultLocale(),
+  locale: 'auto',
   theme: 'system',
   bindings: structuredClone(DEFAULT_BINDINGS),
   blacklist: [],

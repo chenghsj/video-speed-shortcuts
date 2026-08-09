@@ -72,10 +72,9 @@ describe('settings editor workflow', () => {
   })
 
   it('keeps save status transitions separate from the edit policy', () => {
-    const saved = reduceEditor(createEditorState(), { type: 'save-succeeded' })
-    expect(saved.state.statusKey).toBe('saved')
-    expect(reduceEditor(saved.state, { type: 'save-status-auto' }).state.statusKey).toBe('autoSave')
-    expect(reduceEditor(saved.state, { type: 'save-failed' }).state.statusKey).toBe('saveFailed')
+    const failed = reduceEditor(createEditorState(), { type: 'save-failed' })
+    expect(failed.state.statusKey).toBe('saveFailed')
+    expect(reduceEditor(failed.state, { type: 'save-succeeded' }).state.statusKey).toBe('autoSave')
   })
 
   it('restores only the requested settings section', () => {

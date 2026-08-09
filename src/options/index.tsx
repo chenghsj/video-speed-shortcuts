@@ -1,5 +1,6 @@
-import { Check, Gauge, Globe2, Keyboard, Languages, Monitor, Moon, RotateCcw, Sun, Timer, Trash2 } from 'lucide-react'
+import { Gauge, Globe2, Keyboard, Languages, Monitor, Moon, RotateCcw, Sun, Timer, Trash2 } from 'lucide-react'
 import { createRoot } from 'react-dom/client'
+import { GitHubIcon } from '../components/github-icon'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '../components/ui/card'
@@ -17,6 +18,8 @@ import { useSettingsEditor } from './use-settings-editor'
 import '../styles.css'
 
 document.body.className = 'options-page'
+
+const GITHUB_REPOSITORY_URL = 'https://github.com/chenghsj/video-speed-shortcuts'
 
 const ACTION_COPY: Record<ShortcutAction, { title: TranslationKey; description: TranslationKey }> = {
   holdSpeed: { title: 'holdSpeedTitle', description: 'holdSpeedDescription' },
@@ -60,7 +63,7 @@ const NumericField = ({
         value={value}
         onChange={event => onChange(event.target.value)}
         onBlur={onBlur}
-        className="h-9 pr-9 text-base font-semibold tracking-tight"
+        className={`h-9 text-base font-semibold tracking-tight ${suffix ? 'pr-9' : 'pr-2.5'}`}
       />
       {suffix ? (
         <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">
@@ -133,28 +136,23 @@ const App = () => {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-3 py-4 md:px-5 md:py-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <header className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <img src="/icons/icon-128.png" alt="" className="size-9 shrink-0" />
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">{t('appName')}</h1>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{t('description')}</p>
           </div>
         </div>
-
-        <div className="flex items-center justify-between gap-4 rounded-lg border bg-card/85 px-3 py-2.5 shadow-sm backdrop-blur-xl md:min-w-64">
-          <div>
-            <p className="text-sm font-semibold">{t('enabled')}</p>
-            <Badge variant={settings.enabled ? 'success' : 'secondary'} className="mt-1 gap-1 px-2 py-0.5">
-              <span className="size-1.5 rounded-full bg-current" />
-              {settings.enabled ? t('active') : t('inactive')}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-1">
-            <RestoreButton label={t('reset')} onClick={() => resetSection('enabled')} />
-            <Switch checked={settings.enabled} onCheckedChange={checked => patchSettings({ enabled: checked })} aria-label={t('enabled')} />
-          </div>
-        </div>
+        <a
+          href={GITHUB_REPOSITORY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          aria-label="GitHub repository"
+        >
+          <GitHubIcon className="size-4" />
+          GitHub
+        </a>
       </header>
 
       <main className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(18rem,3fr)] lg:items-start">
@@ -280,6 +278,19 @@ const App = () => {
         </div>
 
         <aside className="grid min-w-0 content-start gap-3">
+          <Card className="bg-card/85 backdrop-blur-xl">
+            <CardContent className="flex items-center justify-between gap-4 p-3">
+              <div>
+                <p className="text-sm font-semibold">{t('enabled')}</p>
+                <Badge variant={settings.enabled ? 'success' : 'secondary'} className="mt-1 gap-1 px-2 py-0.5">
+                  <span className="size-1.5 rounded-full bg-current" />
+                  {settings.enabled ? t('active') : t('inactive')}
+                </Badge>
+              </div>
+              <Switch checked={settings.enabled} onCheckedChange={checked => patchSettings({ enabled: checked })} aria-label={t('enabled')} />
+            </CardContent>
+          </Card>
+
           <Card className="bg-card/85 backdrop-blur-xl">
             <CardHeader className="p-4 pb-3">
               <div className="flex items-start justify-between gap-3">
@@ -411,10 +422,9 @@ const App = () => {
         </aside>
       </main>
 
-      {statusKey !== 'autoSave' && (
+      {statusKey === 'saveFailed' && (
         <footer className="flex justify-end px-1 py-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-2" aria-live="polite">
-            {statusKey === 'saved' && <Check aria-hidden="true" className="size-4 text-emerald-500" />}
             {t(statusKey)}
           </span>
         </footer>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Video Speed Shortcuts disabled</title>
+  <desc id="desc">Two forward play arrows on a neutral gray rounded square.</desc>
+  <rect width="128" height="128" rx="28" fill="#929792"/>
+  <path d="M30 38.4c0-4.2 4.7-6.7 8.2-4.3l34.4 23.7a7.5 7.5 0 0 1 0 12.4L38.2 93.9C34.7 96.3 30 93.8 30 89.6V38.4Z" fill="#FFF"/>
+  <path d="M64 38.4c0-4.2 4.7-6.7 8.2-4.3l34.4 23.7a7.5 7.5 0 0 1 0 12.4L72.2 93.9C68.7 96.3 64 93.8 64 89.6V38.4Z" fill="#FFF"/>
+</svg>

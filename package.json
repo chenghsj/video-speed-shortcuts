@@ -1,0 +1,39 @@
+{
+  "name": "video-speed-shortcuts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && npm run build:chromium",
+    "build:chromium": "vite build --mode chromium --outDir dist/chromium",
+    "build:firefox": "vite build --mode firefox --outDir dist/firefox",
+    "build:release": "npm run typecheck && npm run build:chromium && npm run build:firefox",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.7.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/chrome": "^0.1.42",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.6"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@radix-ui/react-select": "^2.3.7",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.30.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0"
+  }
+}

@@ -1,8 +1,9 @@
 import { bindingFromEvent } from '../shared/keys'
 import { DEFAULT_SETTINGS, getSettings, subscribeSettings } from '../shared/settings'
-import { isSiteBlocked } from '../shared/site-matching'
+import { resolveSitePreferences } from '../shared/site-matching'
 import type { VideoSpeedSettings } from '../shared/types'
-import { hideIndicator, showIndicator } from './indicator'
+import { claimContentScriptInitialization } from './bootstrap'
+import { hideIndicator, showIndicator, showPlaybackHint } from './indicator'
 import {
   createContentShortcutRuntime,
   type RuntimeEffect,
@@ -70,8 +71,12 @@ const applyEffects = (effects: RuntimeEffect[], event?: KeyboardEvent): void => 
         break
       case 'toggle-playback': {
         const video = videoFromEffect(effect)
-        if (video.paused) void video.play().catch(() => undefined)
+        const willPlay = video.paused
+        if (willPlay) void video.play().catch(() => undefined)
         else video.pause()
+        if (effect.showIndicator) {
+          showPlaybackHint(willPlay ? 'play' : 'pause', video.ownerDocument, video)
+        }
         break
       }
       case 'set-speed': {
@@ -107,7 +112,7 @@ const handleKeydown = (event: KeyboardEvent): void => {
     binding: bindingFromEvent(event),
     repeat: event.repeat,
     isTypingTarget: isTypingTarget(event),
-    isSiteBlocked: isSiteBlocked(location.hostname, currentSettings.blacklist),
+    isSiteBlocked: currentSiteBlocked,
     video: toRuntimeVideo(findActiveVideo()),
   }
   applyEffects(runtime.dispatch(input), event)
@@ -118,25 +123,32 @@ const handleKeyup = (event: KeyboardEvent): void => {
 }
 
 let currentSettings: VideoSpeedSettings = DEFAULT_SETTINGS
+let currentSiteBlocked = false
 
-void getSettings()
-  .then(nextSettings => {
-    currentSettings = nextSettings
-    applyEffects(runtime.dispatch(settingsReadyInput(nextSettings)))
+const applySettings = (nextSettings: VideoSpeedSettings): void => {
+  const preferences = resolveSitePreferences(location.hostname, nextSettings.siteRules, nextSettings)
+  currentSiteBlocked = preferences.blocked
+  currentSettings = {
+    ...nextSettings,
+    targetSpeed: preferences.targetSpeed,
+    showIndicator: preferences.showIndicator,
+  }
+  applyEffects(runtime.dispatch(settingsReadyInput(currentSettings)))
+}
+
+if (claimContentScriptInitialization(globalThis)) {
+  void getSettings()
+    .then(applySettings)
+    .catch(() => {
+      applySettings(DEFAULT_SETTINGS)
+    })
+
+  subscribeSettings(applySettings)
+
+  window.addEventListener('keydown', handleKeydown, true)
+  window.addEventListener('keyup', handleKeyup, true)
+  window.addEventListener('blur', () => applyEffects(runtime.dispatch({ type: 'focus-lost' })))
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) applyEffects(runtime.dispatch({ type: 'focus-lost' }))
   })
-  .catch(() => {
-    currentSettings = DEFAULT_SETTINGS
-    applyEffects(runtime.dispatch(settingsReadyInput(DEFAULT_SETTINGS)))
-  })
-
-subscribeSettings(nextSettings => {
-  currentSettings = nextSettings
-  applyEffects(runtime.dispatch(settingsReadyInput(nextSettings)))
-})
-
-window.addEventListener('keydown', handleKeydown, true)
-window.addEventListener('keyup', handleKeyup, true)
-window.addEventListener('blur', () => applyEffects(runtime.dispatch({ type: 'focus-lost' })))
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) applyEffects(runtime.dispatch({ type: 'focus-lost' }))
-})
+}

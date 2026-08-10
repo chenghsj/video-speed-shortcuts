@@ -1,7 +1,9 @@
 import { DEFAULT_BINDINGS } from './keys'
+import { NUMERIC_SETTING_CONSTRAINTS, type NumericSettingId } from './numeric-settings'
 import { normalizeHostname } from './site-matching'
 import {
   LOCALES,
+  SETTINGS_VERSION,
   SHORTCUT_ACTIONS,
   THEMES,
   type KeyBinding,
@@ -13,18 +15,22 @@ import {
 export const STORAGE_KEY = 'videoSpeedSettings'
 
 export const DEFAULT_SETTINGS: VideoSpeedSettings = {
-  version: 3,
+  version: SETTINGS_VERSION,
   enabled: true,
   minimumSpeed: 0.25,
-  maximumSpeed: 4,
+  maximumSpeed: 2,
   speedStep: 0.25,
+  targetSpeed: 2,
   holdSpeed: 2,
   holdDelayMs: 250,
   showIndicator: true,
   locale: 'auto',
   theme: 'system',
   bindings: structuredClone(DEFAULT_BINDINGS),
-  blacklist: [],
+  shortcutEnabled: Object.fromEntries(
+    SHORTCUT_ACTIONS.map(action => [action, true])
+  ) as Record<(typeof SHORTCUT_ACTIONS)[number], boolean>,
+  siteRules: [],
 }
 
 export type SettingsUpdater =
@@ -54,6 +60,16 @@ const finiteOr = (value: unknown, fallback: number): number => {
   return Number.isFinite(candidate) ? candidate : fallback
 }
 
+const normalizeNumericSetting = (
+  id: NumericSettingId,
+  value: unknown,
+  fallback: number
+): number => {
+  const { min, max } = NUMERIC_SETTING_CONSTRAINTS[id]
+  const normalized = clamp(finiteOr(value, fallback), min, max)
+  return id === 'holdDelayMs' ? Math.round(normalized) : roundSpeed(normalized)
+}
+
 const isKeyBinding = (value: unknown): value is KeyBinding => {
   if (!value || typeof value !== 'object') return false
   const binding = value as Partial<KeyBinding>
@@ -74,18 +90,36 @@ const isLocale = (value: unknown): value is Locale =>
 const isTheme = (value: unknown): value is Theme =>
   typeof value === 'string' && THEMES.includes(value as Theme)
 
-const normalizeBlacklist = (value: unknown): VideoSpeedSettings['blacklist'] => {
+const normalizeSiteRules = (
+  value: unknown,
+  minimumSpeed: number,
+  maximumSpeed: number
+): VideoSpeedSettings['siteRules'] => {
   if (!Array.isArray(value)) return []
 
   const entries = value.flatMap(item => {
     const source = typeof item === 'string' ? { host: item, enabled: true } : item
     if (!source || typeof source !== 'object') return []
 
-    const candidate = source as { host?: unknown; enabled?: unknown }
+    const candidate = source as {
+      host?: unknown
+      enabled?: unknown
+      targetSpeed?: unknown
+      showIndicator?: unknown
+    }
     const host = normalizeHostname(candidate.host)
     if (!host) return []
 
-    return [{ host, enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : true }]
+    const targetSpeed = candidate.targetSpeed == null
+      ? null
+      : roundSpeed(clamp(finiteOr(candidate.targetSpeed, minimumSpeed), minimumSpeed, maximumSpeed))
+
+    return [{
+      host,
+      enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : true,
+      targetSpeed,
+      showIndicator: typeof candidate.showIndicator === 'boolean' ? candidate.showIndicator : null,
+    }]
   })
 
   const unique = new Map(entries.map(entry => [entry.host, entry]))
@@ -95,27 +129,46 @@ const normalizeBlacklist = (value: unknown): VideoSpeedSettings['blacklist'] => 
 }
 
 export const normalizeSettings = (value: unknown): VideoSpeedSettings => {
-  const source = value && typeof value === 'object' ? (value as Partial<VideoSpeedSettings>) : {}
-  const minimumSpeed = roundSpeed(
-    clamp(finiteOr(source.minimumSpeed, DEFAULT_SETTINGS.minimumSpeed), 0.1, 1)
+  const source = value && typeof value === 'object'
+    ? (value as Partial<VideoSpeedSettings> & { blacklist?: unknown })
+    : {}
+  const minimumSpeed = normalizeNumericSetting(
+    'minimumSpeed',
+    source.minimumSpeed,
+    DEFAULT_SETTINGS.minimumSpeed
   )
-  const maximumSpeed = roundSpeed(
-    clamp(finiteOr(source.maximumSpeed, DEFAULT_SETTINGS.maximumSpeed), 1, 16)
+  const maximumSpeed = normalizeNumericSetting(
+    'maximumSpeed',
+    source.maximumSpeed,
+    DEFAULT_SETTINGS.maximumSpeed
   )
 
   return {
-    version: 3,
+    version: SETTINGS_VERSION,
     enabled: typeof source.enabled === 'boolean' ? source.enabled : DEFAULT_SETTINGS.enabled,
     minimumSpeed,
     maximumSpeed: Math.max(minimumSpeed, maximumSpeed),
-    speedStep: roundSpeed(
-      clamp(finiteOr(source.speedStep, DEFAULT_SETTINGS.speedStep), 0.05, 4)
+    speedStep: normalizeNumericSetting(
+      'speedStep',
+      source.speedStep,
+      DEFAULT_SETTINGS.speedStep
     ),
-    holdSpeed: roundSpeed(
-      clamp(finiteOr(source.holdSpeed, DEFAULT_SETTINGS.holdSpeed), 0.1, 16)
+    targetSpeed: roundSpeed(
+      clamp(
+        finiteOr(source.targetSpeed, DEFAULT_SETTINGS.targetSpeed),
+        minimumSpeed,
+        Math.max(minimumSpeed, maximumSpeed)
+      )
     ),
-    holdDelayMs: Math.round(
-      clamp(finiteOr(source.holdDelayMs, DEFAULT_SETTINGS.holdDelayMs), 100, 1000)
+    holdSpeed: normalizeNumericSetting(
+      'holdSpeed',
+      source.holdSpeed,
+      DEFAULT_SETTINGS.holdSpeed
+    ),
+    holdDelayMs: normalizeNumericSetting(
+      'holdDelayMs',
+      source.holdDelayMs,
+      DEFAULT_SETTINGS.holdDelayMs
     ),
     showIndicator:
       typeof source.showIndicator === 'boolean'
@@ -131,12 +184,25 @@ export const normalizeSettings = (value: unknown): VideoSpeedSettings => {
           : DEFAULT_BINDINGS[action],
       ])
     ) as VideoSpeedSettings['bindings'],
-    blacklist: normalizeBlacklist(source.blacklist),
+    shortcutEnabled: Object.fromEntries(
+      SHORTCUT_ACTIONS.map(action => [
+        action,
+        typeof source.shortcutEnabled?.[action] === 'boolean'
+          ? source.shortcutEnabled[action]
+          : true,
+      ])
+    ) as VideoSpeedSettings['shortcutEnabled'],
+    siteRules: normalizeSiteRules(
+      source.siteRules ?? source.blacklist,
+      minimumSpeed,
+      Math.max(minimumSpeed, maximumSpeed)
+    ),
   }
 }
 
 export const createSettingsStore = (storage: SettingsStorageAdapter): SettingsStore => {
   let current = DEFAULT_SETTINGS
+  let persisted = DEFAULT_SETTINGS
   let writeQueue: Promise<void> = Promise.resolve()
   let externalUnsubscribe: (() => void) | null = null
   const listeners = new Set<(settings: VideoSpeedSettings) => void>()
@@ -150,11 +216,14 @@ export const createSettingsStore = (storage: SettingsStorageAdapter): SettingsSt
   const ensureExternalSubscription = (): void => {
     if (externalUnsubscribe || listeners.size === 0) return
     externalUnsubscribe = storage.subscribe(value => {
-      emit(value)
+      persisted = emit(value)
     })
   }
 
-  const get = async (): Promise<VideoSpeedSettings> => emit(await storage.read())
+  const get = async (): Promise<VideoSpeedSettings> => {
+    persisted = emit(await storage.read())
+    return persisted
+  }
 
   const save = async (settings: VideoSpeedSettings): Promise<void> => {
     const next = emit(settings)
@@ -162,7 +231,13 @@ export const createSettingsStore = (storage: SettingsStorageAdapter): SettingsSt
       .catch(() => undefined)
       .then(() => storage.write(next))
     writeQueue = pendingWrite.catch(() => undefined)
-    await pendingWrite
+    try {
+      await pendingWrite
+      persisted = next
+    } catch (error) {
+      if (current === next) emit(persisted)
+      throw error
+    }
   }
 
   const update = async (updater: SettingsUpdater): Promise<VideoSpeedSettings> => {

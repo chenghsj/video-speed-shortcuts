@@ -33,8 +33,31 @@ describe('settings editor workflow', () => {
     expect(cleared.state.draftNumbers.maximumSpeed).toBe(String(DEFAULT_SETTINGS.maximumSpeed))
   })
 
+  it('commits target speed within the current playback range', () => {
+    const state = createEditorState({
+      ...DEFAULT_SETTINGS,
+      minimumSpeed: 0.5,
+      maximumSpeed: 2,
+    })
+    const committed = reduceEditor(
+      reduceEditor(state, { type: 'set-number-draft', id: 'targetSpeed', value: '3' }).state,
+      { type: 'commit-number', id: 'targetSpeed' }
+    )
+
+    expect(committed.state.settings.targetSpeed).toBe(2)
+    expect(committed.state.draftNumbers.targetSpeed).toBe('2')
+  })
+
   it('keeps a conflicting shortcut in recording mode and saves a valid capture', () => {
     const state = reduceEditor(createEditorState(), { type: 'start-recording', action: 'speedUp' }).state
+    const targetConflict = reduceEditor(state, {
+      type: 'capture-binding',
+      binding: DEFAULT_SETTINGS.bindings.toggleTargetSpeed,
+    })
+
+    expect(targetConflict.state.recordingAction).toBe('speedUp')
+    expect(targetConflict.state.shortcutConflict).toBe('toggleTargetSpeed')
+
     const conflict = reduceEditor(state, {
       type: 'capture-binding',
       binding: DEFAULT_SETTINGS.bindings.speedDown,
@@ -53,28 +76,117 @@ describe('settings editor workflow', () => {
   })
 
   it('owns site-scope validation, duplicate detection, and mutations', () => {
-    const invalid = reduceEditor(createEditorState(), { type: 'add-blacklist' })
-    expect(invalid.state.blacklistError).toBe('invalid')
+    const invalid = reduceEditor(createEditorState(), { type: 'add-site-rules' })
+    expect(invalid.state.siteRulesError).toEqual({ key: 'invalid', line: 1 })
 
     const withDraft = reduceEditor(createEditorState(), {
-      type: 'set-blacklist-draft',
+      type: 'set-site-rules-draft',
       value: 'https://YouTube.com/watch?v=1',
     }).state
-    const added = reduceEditor(withDraft, { type: 'add-blacklist' })
-    expect(added.state.settings.blacklist).toEqual([{ host: 'youtube.com', enabled: true }])
-    expect(added.state.blacklistDraft).toBe('')
+    const added = reduceEditor(withDraft, { type: 'add-site-rules' })
+    expect(added.state.settings.siteRules).toEqual([
+      { host: 'youtube.com', enabled: false, targetSpeed: null, showIndicator: null },
+    ])
+    expect(added.state.siteRulesDraft).toBe('https://YouTube.com/watch?v=1')
+    expect(added.effect?.siteRulesDraft).toBe('https://YouTube.com/watch?v=1')
+    expect(reduceEditor(added.state, {
+      type: 'save-succeeded',
+      siteRulesDraft: added.effect?.siteRulesDraft,
+    }).state.siteRulesDraft).toBe('')
 
     const duplicate = reduceEditor(
-      reduceEditor(added.state, { type: 'set-blacklist-draft', value: 'youtube.com' }).state,
-      { type: 'add-blacklist' }
+      reduceEditor(added.state, { type: 'set-site-rules-draft', value: 'youtube.com' }).state,
+      { type: 'add-site-rules' }
     )
-    expect(duplicate.state.blacklistError).toBe('duplicate')
+    expect(duplicate.state.siteRulesError).toEqual({ key: 'duplicate', line: 1 })
+
+    const duplicateWithinDraft = reduceEditor(
+      reduceEditor(createEditorState(), {
+        type: 'set-site-rules-draft',
+        value: 'youtube.com\nhttps://youtube.com/watch',
+      }).state,
+      { type: 'add-site-rules' }
+    )
+    expect(duplicateWithinDraft.state.siteRulesError).toEqual({ key: 'duplicate', line: 2 })
+    expect(duplicateWithinDraft.state.settings.siteRules).toEqual([])
+
+    const multipleDrafts = reduceEditor(createEditorState(), {
+      type: 'set-site-rules-draft',
+      value: 'youtube.com\nhttps://Example.com/watch\n',
+    }).state
+    const multiple = reduceEditor(multipleDrafts, { type: 'add-site-rules' })
+    expect(multiple.state.settings.siteRules).toEqual([
+      { host: 'youtube.com', enabled: false, targetSpeed: null, showIndicator: null },
+      { host: 'example.com', enabled: false, targetSpeed: null, showIndicator: null },
+    ])
+    expect(multiple.effect?.type).toBe('save')
+
+    const customized = reduceEditor(multiple.state, {
+      type: 'patch-site-rule',
+      host: 'youtube.com',
+      changes: { enabled: false, targetSpeed: 1.5, showIndicator: false },
+    })
+    expect(customized.state.settings.siteRules.find(entry => entry.host === 'youtube.com')).toEqual({
+      host: 'youtube.com',
+      enabled: false,
+      targetSpeed: 1.5,
+      showIndicator: false,
+    })
+
+    const configured = reduceEditor(
+      reduceEditor(createEditorState(), {
+        type: 'set-site-rules-draft',
+        value: 'video.example.com',
+      }).state,
+      {
+        type: 'add-site-rules',
+        rule: { enabled: true, targetSpeed: 1.5, showIndicator: false },
+      }
+    )
+    expect(configured.state.settings.siteRules).toEqual([{
+      host: 'video.example.com',
+      enabled: true,
+      targetSpeed: 1.5,
+      showIndicator: false,
+    }])
+
+    const partiallyInvalid = reduceEditor(
+      reduceEditor(createEditorState(), {
+        type: 'set-site-rules-draft',
+        value: 'youtube.com\nnot-a-domain',
+      }).state,
+      { type: 'add-site-rules' }
+    )
+    expect(partiallyInvalid.state.siteRulesError).toEqual({ key: 'invalid', line: 2 })
+    expect(partiallyInvalid.state.settings.siteRules).toEqual([])
+    expect(partiallyInvalid.effect).toBeUndefined()
+
+    const removed = reduceEditor(multiple.state, {
+      type: 'remove-site-rules',
+      hosts: ['youtube.com', 'example.com'],
+    })
+    expect(removed.state.settings.siteRules).toEqual([])
+    expect(removed.effect?.type).toBe('save')
   })
 
   it('keeps save status transitions separate from the edit policy', () => {
     const failed = reduceEditor(createEditorState(), { type: 'save-failed' })
     expect(failed.state.statusKey).toBe('saveFailed')
     expect(reduceEditor(failed.state, { type: 'save-succeeded' }).state.statusKey).toBe('autoSave')
+  })
+
+  it('keeps a submitted site-rule draft available when saving fails', () => {
+    const draft = 'youtube.com\nexample.com'
+    const withDraft = reduceEditor(createEditorState(), {
+      type: 'set-site-rules-draft',
+      value: draft,
+    }).state
+
+    const submitted = reduceEditor(withDraft, { type: 'add-site-rules' })
+    const failed = reduceEditor(submitted.state, { type: 'save-failed' })
+
+    expect(failed.state.siteRulesDraft).toBe(draft)
+    expect(failed.state.statusKey).toBe('saveFailed')
   })
 
   it('restores only the requested settings section', () => {
@@ -84,6 +196,7 @@ describe('settings editor workflow', () => {
       minimumSpeed: 0.5,
       maximumSpeed: 8,
       speedStep: 0.5,
+      targetSpeed: 3,
       holdSpeed: 3,
       holdDelayMs: 500,
       showIndicator: false,
@@ -93,7 +206,11 @@ describe('settings editor workflow', () => {
         ...DEFAULT_SETTINGS.bindings,
         speedUp: { ...DEFAULT_SETTINGS.bindings.speedUp, code: 'KeyS', key: 's' },
       },
-      blacklist: [{ host: 'youtube.com', enabled: true }],
+      shortcutEnabled: {
+        ...DEFAULT_SETTINGS.shortcutEnabled,
+        speedUp: false,
+      },
+      siteRules: [{ host: 'youtube.com', enabled: true, targetSpeed: null, showIndicator: null }],
     })
 
     const restored = reduceEditor(customized, { type: 'reset-section', section: 'quickControls' })
@@ -103,17 +220,20 @@ describe('settings editor workflow', () => {
       minimumSpeed: DEFAULT_SETTINGS.minimumSpeed,
       maximumSpeed: DEFAULT_SETTINGS.maximumSpeed,
       speedStep: DEFAULT_SETTINGS.speedStep,
+      targetSpeed: DEFAULT_SETTINGS.targetSpeed,
       holdSpeed: DEFAULT_SETTINGS.holdSpeed,
       holdDelayMs: DEFAULT_SETTINGS.holdDelayMs,
       showIndicator: DEFAULT_SETTINGS.showIndicator,
     })
     expect(restored.state.settings.enabled).toBe(false)
     expect(restored.state.settings.locale).toBe('en')
-    expect(restored.state.settings.blacklist).toEqual([{ host: 'youtube.com', enabled: true }])
+    expect(restored.state.settings.siteRules).toEqual([
+      { host: 'youtube.com', enabled: true, targetSpeed: null, showIndicator: null },
+    ])
     expect(restored.effect).toEqual({ type: 'save', settings: restored.state.settings })
   })
 
-  it('clears transient state when restoring shortcuts or blocked sites', () => {
+  it('clears transient state when restoring shortcuts', () => {
     const recording = reduceEditor(createEditorState(), {
       type: 'start-recording',
       action: 'speedUp',
@@ -121,21 +241,41 @@ describe('settings editor workflow', () => {
     const shortcuts = reduceEditor(recording, { type: 'reset-section', section: 'shortcuts' })
     expect(shortcuts.state.recordingAction).toBeNull()
     expect(shortcuts.state.settings.bindings).toEqual(DEFAULT_SETTINGS.bindings)
+    expect(shortcuts.state.settings.shortcutEnabled).toEqual(DEFAULT_SETTINGS.shortcutEnabled)
+  })
 
-    const blacklistState = {
-      ...createEditorState({
-        ...DEFAULT_SETTINGS,
-        blacklist: [{ host: 'youtube.com', enabled: true }],
-      }),
-      blacklistDraft: 'example.com',
-      blacklistError: 'duplicate' as const,
+  it('replaces all settings and clears transient editor state after an import succeeds', () => {
+    let state = reduceEditor(createEditorState(), {
+      type: 'start-recording',
+      action: 'speedUp',
+    }).state
+    state = reduceEditor(state, {
+      type: 'capture-binding',
+      binding: DEFAULT_SETTINGS.bindings.speedDown,
+    }).state
+    state = reduceEditor(state, { type: 'set-site-rules-draft', value: 'not-a-domain' }).state
+    state = reduceEditor(state, { type: 'add-site-rules' }).state
+    state = reduceEditor(state, { type: 'save-failed' }).state
+
+    const imported = {
+      ...DEFAULT_SETTINGS,
+      enabled: false,
+      locale: 'en' as const,
+      theme: 'dark' as const,
+      siteRules: [{ host: 'youtube.com', enabled: true, targetSpeed: 1.5, showIndicator: false }],
     }
-    const blockedSites = reduceEditor(blacklistState, {
-      type: 'reset-section',
-      section: 'blockedSites',
+    const replaced = reduceEditor(state, {
+      type: 'replace-settings-succeeded',
+      settings: imported,
     })
-    expect(blockedSites.state.settings.blacklist).toEqual([])
-    expect(blockedSites.state.blacklistDraft).toBe('')
-    expect(blockedSites.state.blacklistError).toBeNull()
+
+    expect(replaced.effect).toBeUndefined()
+    expect(replaced.state.settings).toEqual(imported)
+    expect(replaced.state.recordingAction).toBeNull()
+    expect(replaced.state.shortcutConflict).toBeNull()
+    expect(replaced.state.siteRulesDraft).toBe('')
+    expect(replaced.state.siteRulesError).toBeNull()
+    expect(replaced.state.statusKey).toBe('autoSave')
+    expect(replaced.state.draftNumbers.targetSpeed).toBe(String(imported.targetSpeed))
   })
 })

@@ -1,4 +1,5 @@
 import { normalizeSettings, STORAGE_KEY } from './shared/settings'
+import contentScriptFile from './content/index.ts?iife'
 
 const ACTION_ICONS = {
   enabled: {
@@ -19,10 +20,32 @@ const syncActionIcon = async (): Promise<void> => {
   await setActionIcon(normalizeSettings(stored[STORAGE_KEY]).enabled)
 }
 
+const injectContentScriptIntoOpenTabs = async (): Promise<void> => {
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] })
+  const injectableTabs = tabs.filter(
+    (tab): tab is chrome.tabs.Tab & { id: number } =>
+      tab.id !== undefined &&
+      typeof tab.url === 'string' &&
+      (tab.url.startsWith('http://') || tab.url.startsWith('https://'))
+  )
+
+  await Promise.allSettled(
+    injectableTabs.map(tab =>
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        files: [contentScriptFile],
+      })
+    )
+  )
+}
+
 void syncActionIcon().catch(() => undefined)
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(details => {
   void syncActionIcon().catch(() => undefined)
+  if (details.reason === 'install') {
+    void injectContentScriptIntoOpenTabs().catch(() => undefined)
+  }
 })
 
 chrome.runtime.onStartup.addListener(() => {

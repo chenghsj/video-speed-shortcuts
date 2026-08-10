@@ -29,7 +29,7 @@ export type RuntimeEffect =
   | { type: 'cancel-hold'; holdId: number }
   | { type: 'play'; video: RuntimeVideo }
   | { type: 'pause'; video: RuntimeVideo }
-  | { type: 'toggle-playback'; video: RuntimeVideo }
+  | { type: 'toggle-playback'; video: RuntimeVideo; showIndicator: boolean }
   | {
       type: 'set-speed'
       video: RuntimeVideo
@@ -128,7 +128,11 @@ export const createContentShortcutRuntime = (
     ]
 
     if (!current.active) {
-      effects.push({ type: 'toggle-playback', video: current.video })
+      effects.push({
+        type: 'toggle-playback',
+        video: current.video,
+        showIndicator: settings.showIndicator,
+      })
       return effects
     }
 
@@ -152,6 +156,9 @@ export const createContentShortcutRuntime = (
   const handleKeydown = (
     input: Extract<RuntimeInput, { type: 'keydown' }>
   ): RuntimeEffect[] => {
+    const matches = (action: keyof VideoSpeedSettings['bindings']): boolean =>
+      settings.shortcutEnabled[action] && bindingsEqual(input.binding, settings.bindings[action])
+
     if (
       !settingsReady ||
       !settings.enabled ||
@@ -161,16 +168,20 @@ export const createContentShortcutRuntime = (
       return []
     }
 
-    if (holdState && bindingsEqual(input.binding, settings.bindings.holdSpeed)) {
+    if (holdState && matches('holdSpeed')) {
+      return [{ type: 'intercept' }]
+    }
+
+    if (holdState && matches('toggleTargetSpeed')) {
       return [{ type: 'intercept' }]
     }
 
     const video = input.video
     if (!video) return []
 
-    if (bindingsEqual(input.binding, settings.bindings.holdSpeed)) return beginHold(input)
+    if (matches('holdSpeed')) return beginHold(input)
 
-    if (bindingsEqual(input.binding, settings.bindings.speedUp)) {
+    if (matches('speedUp')) {
       return [
         { type: 'intercept' },
         setSpeedEffect(settings, video, resolveNextSpeed(video.playbackRate, 1, settings), {
@@ -179,7 +190,7 @@ export const createContentShortcutRuntime = (
       ]
     }
 
-    if (bindingsEqual(input.binding, settings.bindings.speedDown)) {
+    if (matches('speedDown')) {
       return [
         { type: 'intercept' },
         setSpeedEffect(settings, video, resolveNextSpeed(video.playbackRate, -1, settings), {
@@ -188,10 +199,18 @@ export const createContentShortcutRuntime = (
       ]
     }
 
-    if (!input.repeat && bindingsEqual(input.binding, settings.bindings.speedReset)) {
+    if (!input.repeat && matches('speedReset')) {
       return [
         { type: 'intercept' },
         setSpeedEffect(settings, video, 1, { updateDefaultPlaybackRate: true }),
+      ]
+    }
+
+    if (matches('toggleTargetSpeed')) {
+      if (input.repeat) return [{ type: 'intercept' }]
+      return [
+        { type: 'intercept' },
+        setSpeedEffect(settings, video, settings.targetSpeed, { updateDefaultPlaybackRate: true }),
       ]
     }
 

@@ -1,36 +1,54 @@
 import { bindingFromEvent, bindingsEqual } from '../shared/keys'
+import { NUMERIC_SETTING_CONSTRAINTS } from '../shared/numeric-settings'
 import { DEFAULT_SETTINGS, normalizeSettings } from '../shared/settings'
 import { normalizeHostname } from '../shared/site-matching'
 import {
   SHORTCUT_ACTIONS,
   type KeyBinding,
   type ShortcutAction,
+  type SiteRule,
   type VideoSpeedSettings,
 } from '../shared/types'
 
 export const NUMBER_FIELDS = [
-  { id: 'minimumSpeed', label: 'minimumSpeed', min: 0.1, max: 1, step: 0.05 },
-  { id: 'maximumSpeed', label: 'maximumSpeed', min: 1, max: 16, step: 0.05 },
-  { id: 'speedStep', label: 'speedStep', min: 0.05, max: 4, step: 0.05 },
+  { id: 'minimumSpeed', label: 'minimumSpeed', ...NUMERIC_SETTING_CONSTRAINTS.minimumSpeed },
+  { id: 'maximumSpeed', label: 'maximumSpeed', ...NUMERIC_SETTING_CONSTRAINTS.maximumSpeed },
+  { id: 'speedStep', label: 'speedStep', ...NUMERIC_SETTING_CONSTRAINTS.speedStep },
 ] as const
 
 export const HOLD_FIELDS = [
-  { id: 'holdSpeed', label: 'holdSpeed', min: 0.1, max: 16, step: 0.05 },
-  { id: 'holdDelayMs', label: 'holdDelay', min: 100, max: 1000, step: 10, suffix: 'ms' },
+  { id: 'holdSpeed', label: 'holdSpeed', ...NUMERIC_SETTING_CONSTRAINTS.holdSpeed },
+  {
+    id: 'holdDelayMs',
+    label: 'holdDelay',
+    ...NUMERIC_SETTING_CONSTRAINTS.holdDelayMs,
+    suffix: 'ms',
+  },
 ] as const
 
-export type NumberFieldId = (typeof NUMBER_FIELDS)[number]['id'] | (typeof HOLD_FIELDS)[number]['id']
+export const TARGET_SPEED_FIELD = {
+  id: 'targetSpeed',
+  label: 'targetSpeed',
+  step: NUMERIC_SETTING_CONSTRAINTS.targetSpeed.step,
+} as const
+
+export type NumberFieldId =
+  | (typeof NUMBER_FIELDS)[number]['id']
+  | (typeof HOLD_FIELDS)[number]['id']
+  | typeof TARGET_SPEED_FIELD.id
 export type EditorStatusKey = 'autoSave' | 'saveFailed'
 export type EditorErrorKey = 'invalid' | 'duplicate'
-export type EditorSection = 'quickControls' | 'shortcuts' | 'blockedSites' | 'appearance'
+export type EditorSiteRuleError = { key: EditorErrorKey; line: number }
+export type NewSiteRule = Omit<SiteRule, 'host'>
+export type EditorSection = 'quickControls' | 'shortcuts' | 'appearance'
 
 export type EditorState = {
   settings: VideoSpeedSettings
   recordingAction: ShortcutAction | null
   shortcutConflict: ShortcutAction | null
   statusKey: EditorStatusKey
-  blacklistDraft: string
-  blacklistError: EditorErrorKey | null
+  siteRulesDraft: string
+  siteRulesError: EditorSiteRuleError | null
   draftNumbers: Record<NumberFieldId, string>
 }
 
@@ -42,15 +60,21 @@ export type EditorEvent =
   | { type: 'start-recording'; action: ShortcutAction }
   | { type: 'cancel-recording' }
   | { type: 'capture-binding'; binding: KeyBinding | null }
-  | { type: 'set-blacklist-draft'; value: string }
-  | { type: 'add-blacklist' }
-  | { type: 'toggle-blacklist'; host: string; enabled: boolean }
-  | { type: 'remove-blacklist'; host: string }
-  | { type: 'save-succeeded' }
+  | { type: 'set-site-rules-draft'; value: string }
+  | { type: 'add-site-rules'; rule?: NewSiteRule }
+  | { type: 'toggle-site-rule'; host: string; enabled: boolean }
+  | { type: 'patch-site-rule'; host: string; changes: Partial<Omit<SiteRule, 'host'>> }
+  | { type: 'remove-site-rules'; hosts: string[] }
+  | { type: 'save-succeeded'; siteRulesDraft?: string }
   | { type: 'save-failed' }
+  | { type: 'replace-settings-succeeded'; settings: VideoSpeedSettings }
   | { type: 'reset-section'; section: EditorSection }
 
-export type EditorEffect = { type: 'save'; settings: VideoSpeedSettings }
+export type EditorEffect = {
+  type: 'save'
+  settings: VideoSpeedSettings
+  siteRulesDraft?: string
+}
 
 export type EditorTransition = {
   state: EditorState
@@ -61,6 +85,7 @@ const draftNumbersFor = (settings: VideoSpeedSettings): Record<NumberFieldId, st
   minimumSpeed: String(settings.minimumSpeed),
   maximumSpeed: String(settings.maximumSpeed),
   speedStep: String(settings.speedStep),
+  targetSpeed: String(settings.targetSpeed),
   holdSpeed: String(settings.holdSpeed),
   holdDelayMs: String(settings.holdDelayMs),
 })
@@ -70,8 +95,8 @@ export const createEditorState = (settings: VideoSpeedSettings = DEFAULT_SETTING
   recordingAction: null,
   shortcutConflict: null,
   statusKey: 'autoSave',
-  blacklistDraft: '',
-  blacklistError: null,
+  siteRulesDraft: '',
+  siteRulesError: null,
   draftNumbers: draftNumbersFor(settings),
 })
 
@@ -139,46 +164,124 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
         }
       )
     }
-    case 'set-blacklist-draft':
+    case 'set-site-rules-draft':
       return {
         state: {
           ...state,
-          blacklistDraft: event.value,
-          blacklistError: null,
+          siteRulesDraft: event.value,
+          siteRulesError: null,
         },
       }
-    case 'add-blacklist': {
-      const host = normalizeHostname(state.blacklistDraft)
-      if (!host) return { state: { ...state, blacklistError: 'invalid' } }
-      if (state.settings.blacklist.some(entry => entry.host === host)) {
-        return { state: { ...state, blacklistError: 'duplicate' } }
+    case 'add-site-rules': {
+      const rule = event.rule ?? {
+        enabled: false,
+        targetSpeed: null,
+        showIndicator: null,
+      }
+      const drafts = state.siteRulesDraft
+        .split(/\r?\n/)
+        .map((value, index) => ({ value: value.trim(), line: index + 1 }))
+        .filter(draft => Boolean(draft.value))
+      if (drafts.length === 0) {
+        return { state: { ...state, siteRulesError: { key: 'invalid', line: 1 } } }
       }
 
+      const normalizedDrafts = drafts.map(draft => ({
+        ...draft,
+        host: normalizeHostname(draft.value),
+      }))
+      const invalidDraft = normalizedDrafts.find(draft => !draft.host)
+      if (invalidDraft) {
+        return {
+          state: {
+            ...state,
+            siteRulesError: { key: 'invalid', line: invalidDraft.line },
+          },
+        }
+      }
+
+      const existingHosts = new Set(state.settings.siteRules.map(entry => entry.host))
+      const seenHosts = new Set<string>()
+      const duplicateDraft = normalizedDrafts.find(draft => {
+        const host = draft.host as string
+        if (existingHosts.has(host) || seenHosts.has(host)) return true
+        seenHosts.add(host)
+        return false
+      })
+      if (duplicateDraft) {
+        return {
+          state: {
+            ...state,
+            siteRulesError: { key: 'duplicate', line: duplicateDraft.line },
+          },
+        }
+      }
+
+      const normalizedHosts = normalizedDrafts.map(draft => draft.host as string)
       const transition = save(state, {
         ...state.settings,
-        blacklist: [...state.settings.blacklist, { host, enabled: true }],
+        siteRules: [
+          ...state.settings.siteRules,
+          ...normalizedHosts.map(host => ({
+            host,
+            ...rule,
+          })),
+        ],
       })
       return {
-        state: { ...transition.state, blacklistDraft: '', blacklistError: null },
-        effect: transition.effect,
+        state: { ...transition.state, siteRulesError: null },
+        effect: transition.effect
+          ? { ...transition.effect, siteRulesDraft: state.siteRulesDraft }
+          : undefined,
       }
     }
-    case 'toggle-blacklist':
+    case 'toggle-site-rule':
       return save(state, {
         ...state.settings,
-        blacklist: state.settings.blacklist.map(entry =>
+        siteRules: state.settings.siteRules.map(entry =>
           entry.host === event.host ? { ...entry, enabled: event.enabled } : entry
         ),
       })
-    case 'remove-blacklist':
-      return save(state, {
+    case 'patch-site-rule':
+      return save(state, normalizeSettings({
         ...state.settings,
-        blacklist: state.settings.blacklist.filter(entry => entry.host !== event.host),
-      })
+        siteRules: state.settings.siteRules.map(entry =>
+          entry.host === event.host ? { ...entry, ...event.changes } : entry
+        ),
+      }))
+    case 'remove-site-rules':
+      if (event.hosts.length === 0) return { state }
+      {
+        const hosts = new Set(event.hosts)
+        return save(state, {
+          ...state.settings,
+          siteRules: state.settings.siteRules.filter(entry => !hosts.has(entry.host)),
+        })
+      }
     case 'save-succeeded':
-      return { state: { ...state, statusKey: 'autoSave' } }
+      return {
+        state: {
+          ...state,
+          statusKey: 'autoSave',
+          siteRulesDraft:
+            event.siteRulesDraft !== undefined && state.siteRulesDraft === event.siteRulesDraft
+              ? ''
+              : state.siteRulesDraft,
+        },
+      }
     case 'save-failed':
       return { state: { ...state, statusKey: 'saveFailed' } }
+    case 'replace-settings-succeeded':
+      return {
+        state: {
+          ...withSettings(state, event.settings),
+          recordingAction: null,
+          shortcutConflict: null,
+          statusKey: 'autoSave',
+          siteRulesDraft: '',
+          siteRulesError: null,
+        },
+      }
     case 'reset-section': {
       switch (event.section) {
         case 'quickControls':
@@ -187,6 +290,7 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
             minimumSpeed: DEFAULT_SETTINGS.minimumSpeed,
             maximumSpeed: DEFAULT_SETTINGS.maximumSpeed,
             speedStep: DEFAULT_SETTINGS.speedStep,
+            targetSpeed: DEFAULT_SETTINGS.targetSpeed,
             holdSpeed: DEFAULT_SETTINGS.holdSpeed,
             holdDelayMs: DEFAULT_SETTINGS.holdDelayMs,
             showIndicator: DEFAULT_SETTINGS.showIndicator,
@@ -194,12 +298,11 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
         case 'shortcuts':
           return save(
             { ...state, recordingAction: null, shortcutConflict: null },
-            { ...state.settings, bindings: structuredClone(DEFAULT_SETTINGS.bindings) }
-          )
-        case 'blockedSites':
-          return save(
-            { ...state, blacklistDraft: '', blacklistError: null },
-            { ...state.settings, blacklist: [] }
+            {
+              ...state.settings,
+              bindings: structuredClone(DEFAULT_SETTINGS.bindings),
+              shortcutEnabled: structuredClone(DEFAULT_SETTINGS.shortcutEnabled),
+            }
           )
         case 'appearance':
           return save(state, {

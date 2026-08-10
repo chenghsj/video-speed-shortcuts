@@ -1,6 +1,9 @@
-import { Gauge, Globe2, Keyboard, Languages, Monitor, Moon, RotateCcw, Sun, Timer, Trash2 } from 'lucide-react'
+import { CircleHelp, Gauge, Keyboard, Palette, Pencil, RotateCcw } from 'lucide-react'
 import { createRoot } from 'react-dom/client'
+import { useState } from 'react'
 import { GitHubIcon } from '../components/github-icon'
+import { KeyboardShortcut } from '../components/keyboard-shortcut'
+import { ScrubbableLabel } from '../components/scrubbable-label'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '../components/ui/card'
@@ -9,23 +12,30 @@ import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Separator } from '../components/ui/separator'
 import { Switch } from '../components/ui/switch'
-import { formatBinding } from '../shared/keys'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
 import type { TranslationKey } from '../shared/i18n'
 import { SHORTCUT_ACTIONS, type Locale, type ShortcutAction, type Theme } from '../shared/types'
 import { useLocalizedAppearance } from '../shared/use-localized-appearance'
-import { HOLD_FIELDS, NUMBER_FIELDS } from './editor'
+import { SiteRulesTable } from './site-rules-table'
+import { HOLD_FIELDS, NUMBER_FIELDS, TARGET_SPEED_FIELD } from './editor'
+import { SettingsTransfer } from './settings-transfer'
 import { useSettingsEditor } from './use-settings-editor'
 import '../styles.css'
 
 document.body.className = 'options-page'
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/chenghsj/video-speed-shortcuts'
+type OptionsTab = 'general' | 'sites'
 
-const ACTION_COPY: Record<ShortcutAction, { title: TranslationKey; description: TranslationKey }> = {
-  holdSpeed: { title: 'holdSpeedTitle', description: 'holdSpeedDescription' },
-  speedUp: { title: 'speedUpTitle', description: 'speedUpDescription' },
-  speedDown: { title: 'speedDownTitle', description: 'speedDownDescription' },
-  speedReset: { title: 'speedResetTitle', description: 'speedResetDescription' },
+const getInitialTab = (): OptionsTab => window.location.hash === '#sites' ? 'sites' : 'general'
+
+const ACTION_TITLE: Record<ShortcutAction, TranslationKey> = {
+  holdSpeed: 'holdSpeedTitle',
+  toggleTargetSpeed: 'toggleTargetSpeedTitle',
+  speedUp: 'speedUpTitle',
+  speedDown: 'speedDownTitle',
+  speedReset: 'speedResetTitle',
 }
 
 const NumericField = ({
@@ -49,9 +59,24 @@ const NumericField = ({
   onChange: (value: string) => void
   onBlur: () => void
 }) => (
-  <div className="space-y-1 rounded-lg border bg-background/70 p-2.5 shadow-sm">
-  <Label htmlFor={id} className="text-xs text-muted-foreground">
-      {label}
+  <div className="flex h-full flex-col justify-end gap-1.5">
+    <Label htmlFor={id} className="flex w-full items-start justify-between gap-2 text-xs font-medium text-muted-foreground">
+      <ScrubbableLabel
+        value={Number(value)}
+        min={min}
+        max={max}
+        step={step}
+        onChange={nextValue => onChange(String(nextValue))}
+        onCommit={nextValue => {
+          onChange(String(nextValue))
+          onBlur()
+        }}
+      >
+        {label}
+      </ScrubbableLabel>
+      <span className="shrink-0 font-normal tabular-nums text-muted-foreground/80">
+        {min}–{max}{suffix ? ` ${suffix}` : '×'}
+      </span>
     </Label>
     <div className="relative">
       <Input
@@ -63,7 +88,8 @@ const NumericField = ({
         value={value}
         onChange={event => onChange(event.target.value)}
         onBlur={onBlur}
-        className={`h-9 text-base font-semibold tracking-tight ${suffix ? 'pr-9' : 'pr-2.5'}`}
+        onWheel={event => event.currentTarget.blur()}
+        className={`h-10 text-base font-semibold tracking-tight shadow-none ${suffix ? 'pr-9' : 'pr-2.5'}`}
       />
       {suffix ? (
         <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">
@@ -76,18 +102,13 @@ const NumericField = ({
 
 const AppearanceField = ({
   label,
-  description,
   children,
 }: {
   label: string
-  description: string
   children: React.ReactNode
 }) => (
   <div className="space-y-1.5">
-    <div>
-      <p className="text-sm font-medium">{label}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-    </div>
+    <p className="text-sm font-medium">{label}</p>
     {children}
   </div>
 )
@@ -111,19 +132,31 @@ const App = () => {
     recordingAction,
     shortcutConflict,
     statusKey,
-    blacklistDraft,
-    blacklistError,
+    siteRulesDraft,
+    siteRulesError,
     draftNumbers,
     startRecording,
     setNumberDraft,
     commitNumber,
-    setBlacklistDraft,
-    addBlacklist,
-    toggleBlacklist,
-    removeBlacklist,
+    setSiteRulesDraft,
+    addSiteRules,
+    toggleSiteRule,
+    patchSiteRule,
+    removeSiteRules,
     resetSection,
     patchSettings,
+    replaceSettings,
   } = useSettingsEditor()
+  const [activeTab, setActiveTab] = useState<OptionsTab>(getInitialTab)
+
+  const selectTab = (tab: OptionsTab): void => {
+    setActiveTab(tab)
+    window.history.replaceState(
+      null,
+      '',
+      tab === 'sites' ? '#sites' : `${window.location.pathname}${window.location.search}`
+    )
+  }
 
   const { t, localeOptions, themeOptions } = useLocalizedAppearance(
     settings.locale,
@@ -155,8 +188,129 @@ const App = () => {
         </a>
       </header>
 
-      <main className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(18rem,3fr)] lg:items-start">
+      <nav
+        className="mt-5 inline-flex rounded-lg border bg-muted/50 p-1"
+        role="tablist"
+        aria-label={t('settingsSections')}
+      >
+        {(['general', 'sites'] as const).map(tab => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => selectTab(tab)}
+          >
+            {t(tab === 'general' ? 'generalSettings' : 'sites')}
+          </button>
+        ))}
+      </nav>
+
+      <main className={`${activeTab === 'general' ? 'grid' : 'hidden'} mt-3 gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(18rem,3fr)] lg:items-start`}>
         <div className="grid min-w-0 content-start gap-3">
+          <Card className="bg-card/85 backdrop-blur-xl">
+            <CardHeader className="p-4 pb-2">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+                  <Keyboard aria-hidden="true" className="size-4 text-primary" />
+                  {t('shortcuts')}
+                </h2>
+                <RestoreButton label={t('reset')} onClick={() => resetSection('shortcuts')} />
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <TooltipProvider delayDuration={250}>
+                <div className="overflow-hidden rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="pl-4">{t('actions')}</TableHead>
+                        <TableHead className="w-24 text-center">{t('shortcutEnabled')}</TableHead>
+                        <TableHead className="w-40">{t('shortcutKey')}</TableHead>
+                        <TableHead className="w-12"><span className="sr-only">{t('edit')}</span></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {SHORTCUT_ACTIONS.map(action => {
+                        const recording = recordingAction === action
+                        return (
+                          <TableRow key={action}>
+                            <TableCell className="pl-4 font-medium">
+                              <span>{t(ACTION_TITLE[action])}</span>
+                              {action === 'toggleTargetSpeed' ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="ml-1.5 inline-flex size-5 items-center justify-center rounded-sm align-middle text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      aria-label={t('targetSpeedDescription')}
+                                    >
+                                      <CircleHelp aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{t('targetSpeedDescription')}</TooltipContent>
+                                </Tooltip>
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={settings.shortcutEnabled[action]}
+                                onCheckedChange={checked => patchSettings({
+                                  shortcutEnabled: {
+                                    ...settings.shortcutEnabled,
+                                    [action]: checked,
+                                  },
+                                })}
+                                aria-label={`${t('shortcutEnabled')}: ${t(ACTION_TITLE[action])}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {recording ? (
+                                <span className="inline-flex h-6 items-center rounded-full bg-primary px-2 text-[11px] font-medium text-primary-foreground">
+                                  {t('recording')}
+                                </span>
+                              ) : (
+                                <KeyboardShortcut
+                                  binding={settings.bindings[action]}
+                                  keyClassName="h-6 min-w-6 px-2 text-xs"
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 shrink-0 rounded-md text-muted-foreground"
+                                disabled={recording}
+                                onClick={() => startRecording(action)}
+                                aria-label={`${t('recordShortcut')}: ${t(ACTION_TITLE[action])}`}
+                                title={t('recordShortcut')}
+                              >
+                                <Pencil aria-hidden="true" className="size-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TooltipProvider>
+              {shortcutConflict || recordingAction ? (
+                <p className="mt-2 text-xs text-destructive" aria-live="polite">
+                  {shortcutConflict
+                    ? t('shortcutConflict', { action: t(ACTION_TITLE[shortcutConflict]) })
+                    : t('recordingHint')}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
           <Card className="bg-card/85 backdrop-blur-xl">
             <CardHeader className="p-4 pb-3">
               <div className="flex items-start justify-between gap-3">
@@ -178,7 +332,7 @@ const App = () => {
                   <h3 id="speed-range-heading" className="text-sm font-semibold">{t('speedRange')}</h3>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('speedRangeDescription')}</p>
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {NUMBER_FIELDS.map(field => (
                     <NumericField
                       key={field.id}
@@ -189,6 +343,15 @@ const App = () => {
                       onBlur={() => commitNumber(field.id)}
                     />
                   ))}
+                  <NumericField
+                    {...TARGET_SPEED_FIELD}
+                    min={settings.minimumSpeed}
+                    max={settings.maximumSpeed}
+                    label={t(TARGET_SPEED_FIELD.label)}
+                    value={draftNumbers.targetSpeed}
+                    onChange={value => setNumberDraft('targetSpeed', value)}
+                    onBlur={() => commitNumber('targetSpeed')}
+                  />
                 </div>
               </section>
 
@@ -196,13 +359,10 @@ const App = () => {
 
               <section aria-labelledby="hold-space-heading">
                 <div>
-                  <h3 id="hold-space-heading" className="flex items-center gap-1.5 text-sm font-semibold">
-                    <Timer aria-hidden="true" className="size-3.5 text-primary" />
-                    {t('holdSpace')}
-                  </h3>
+                  <h3 id="hold-space-heading" className="text-sm font-semibold">{t('holdSpace')}</h3>
                   <p className="mt-0.5 text-xs text-muted-foreground">{t('holdSpaceDescription')}</p>
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {HOLD_FIELDS.map(field => (
                     <NumericField
                       key={field.id}
@@ -214,7 +374,7 @@ const App = () => {
                     />
                   ))}
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border bg-background/60 p-3">
+                <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t pt-4">
                   <div>
                     <p className="text-sm font-medium">{t('indicator')}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{t('indicatorDescription')}</p>
@@ -225,56 +385,6 @@ const App = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-card/85 backdrop-blur-xl">
-            <CardHeader className="p-4 pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
-                    <Keyboard aria-hidden="true" className="size-4 text-primary" />
-                    {t('shortcuts')}
-                  </h2>
-                  <CardDescription className="mt-1">{t('shortcutsDescription')}</CardDescription>
-                </div>
-                <RestoreButton label={t('reset')} onClick={() => resetSection('shortcuts')} />
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="overflow-hidden rounded-lg border">
-                {SHORTCUT_ACTIONS.map(action => {
-                  const copy = ACTION_COPY[action]
-                  const recording = recordingAction === action
-                  return (
-                    <div key={action} className="flex flex-col gap-2 border-b p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <div className="mt-0.5 rounded-[5px] bg-muted p-1 text-muted-foreground">
-                          <Keyboard aria-hidden="true" className="size-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{t(copy.title)}</p>
-                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{t(copy.description)}</p>
-                        </div>
-                      </div>
-                      <Button
-                        variant={recording ? 'default' : 'outline'}
-                        size="sm"
-                        className="min-w-32 justify-center font-mono"
-                        onClick={() => startRecording(action)}
-                      >
-                        {recording ? t('recording') : formatBinding(settings.bindings[action])}
-                      </Button>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="mt-2 min-h-4 text-xs text-destructive" aria-live="polite">
-                {shortcutConflict
-                  ? t('shortcutConflict', { action: t(ACTION_COPY[shortcutConflict].title) })
-                  : recordingAction
-                    ? t('recordingHint')
-                    : ''}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <aside className="grid min-w-0 content-start gap-3">
@@ -282,7 +392,8 @@ const App = () => {
             <CardContent className="flex items-center justify-between gap-4 p-3">
               <div>
                 <p className="text-sm font-semibold">{t('enabled')}</p>
-                <Badge variant={settings.enabled ? 'success' : 'secondary'} className="mt-1 gap-1 px-2 py-0.5">
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{t('enabledDescription')}</p>
+                <Badge variant={settings.enabled ? 'success' : 'secondary'} className="mt-2 gap-1 px-2 py-0.5">
                   <span className="size-1.5 rounded-full bg-current" />
                   {settings.enabled ? t('active') : t('inactive')}
                 </Badge>
@@ -296,86 +407,7 @@ const App = () => {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
-                    <Globe2 aria-hidden="true" className="size-4 text-primary" />
-                    {t('blockedSites')}
-                  </h2>
-                  <CardDescription className="mt-1">{t('blockedSitesDescription')}</CardDescription>
-                </div>
-                <RestoreButton label={t('reset')} onClick={() => resetSection('blockedSites')} />
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <form
-                className="grid gap-2"
-                onSubmit={event => {
-                  event.preventDefault()
-                  addBlacklist()
-                }}
-              >
-                <Label htmlFor="blacklist-site" className="sr-only">
-                  {t('blockedSites')}
-                </Label>
-                <Input
-                  id="blacklist-site"
-                  value={blacklistDraft}
-                  onChange={event => setBlacklistDraft(event.target.value)}
-                  placeholder={t('blockedSitePlaceholder')}
-                  aria-invalid={Boolean(blacklistError)}
-                  className="h-9"
-                />
-                <Button type="submit" size="sm" className="w-full">
-                  {t('addBlockedSite')}
-                </Button>
-              </form>
-              <p className="mt-1 min-h-4 text-xs text-destructive" aria-live="polite">
-                {blacklistError === 'invalid'
-                  ? t('blockedSiteInvalid')
-                  : blacklistError === 'duplicate'
-                    ? t('blockedSiteDuplicate')
-                    : ''}
-              </p>
-
-              <div className="overflow-hidden rounded-lg border">
-                {settings.blacklist.length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">{t('blockedSitesEmpty')}</p>
-                ) : (
-                  settings.blacklist.map(entry => (
-                    <div key={entry.host} className="flex items-center justify-between gap-2 border-b p-2.5 last:border-b-0">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{entry.host}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {entry.enabled ? t('blockedSiteEnabled') : t('blockedSiteDisabled')}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Switch
-                          checked={entry.enabled}
-                          onCheckedChange={enabled => toggleBlacklist(entry.host, enabled)}
-                          aria-label={t(entry.enabled ? 'disableBlockedSite' : 'enableBlockedSite', { host: entry.host })}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeBlacklist(entry.host)}
-                          aria-label={t('removeBlockedSite', { host: entry.host })}
-                          title={t('removeBlockedSite', { host: entry.host })}
-                        >
-                          <Trash2 aria-hidden="true" className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/85 backdrop-blur-xl">
-            <CardHeader className="p-4 pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
-                    <Languages aria-hidden="true" className="size-4 text-primary" />
+                    <Palette aria-hidden="true" className="size-4 text-primary" />
                     {t('appearance')}
                   </h2>
                   <CardDescription className="mt-1">{t('appearanceDescription')}</CardDescription>
@@ -384,7 +416,7 @@ const App = () => {
               </div>
             </CardHeader>
             <CardContent className="grid gap-4 p-4 pt-0">
-              <AppearanceField label={t('language')} description={t('languageDescription')}>
+              <AppearanceField label={t('language')}>
                 <Select value={settings.locale} onValueChange={value => patchSettings({ locale: value as Locale })}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
@@ -398,28 +430,43 @@ const App = () => {
                   </SelectContent>
                 </Select>
               </AppearanceField>
-              <AppearanceField label={t('theme')} description={t('themeDescription')}>
-                <div className="relative">
-                  <Select value={settings.theme} onValueChange={value => patchSettings({ theme: value as Theme })}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {themeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="pointer-events-none absolute right-9 top-1/2 hidden -translate-y-1/2 text-muted-foreground sm:block">
-                    {settings.theme === 'dark' ? <Moon className="size-3.5" /> : settings.theme === 'light' ? <Sun className="size-3.5" /> : <Monitor className="size-3.5" />}
-                  </div>
-                </div>
+              <AppearanceField label={t('theme')}>
+                <Select value={settings.theme} onValueChange={value => patchSettings({ theme: value as Theme })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {themeOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </AppearanceField>
             </CardContent>
           </Card>
+
+          <SettingsTransfer settings={settings} t={t} onImport={replaceSettings} />
         </aside>
+
+      </main>
+
+      <main className={activeTab === 'sites' ? 'mt-3' : 'hidden'}>
+        <SiteRulesTable
+          entries={settings.siteRules}
+          minimumSpeed={settings.minimumSpeed}
+          maximumSpeed={settings.maximumSpeed}
+          globalTargetSpeed={settings.targetSpeed}
+          draft={siteRulesDraft}
+          error={siteRulesError}
+          t={t}
+          onDraftChange={setSiteRulesDraft}
+          onAdd={addSiteRules}
+          onToggle={toggleSiteRule}
+          onPatch={patchSiteRule}
+          onRemove={removeSiteRules}
+        />
       </main>
 
       {statusKey === 'saveFailed' && (

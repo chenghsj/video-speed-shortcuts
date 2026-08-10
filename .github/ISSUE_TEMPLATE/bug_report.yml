@@ -1,0 +1,101 @@
+name: Bug report
+description: Report a reproducible problem with Video Speed Shortcuts
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please avoid including private or sensitive information.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What happened, and what were you trying to do?
+      placeholder: Describe the problem clearly and concisely.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable set of steps that reproduces the problem.
+      placeholder: |
+        1. Open ...
+        2. Play a video ...
+        3. Press ...
+        4. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Describe what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Describe what happened instead.
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      description: Find this on your browser's extensions page.
+      placeholder: e.g. 0.1.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Brave
+        - Other Chromium-based browser
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser version
+      placeholder: e.g. Chrome 140.0.7339.81
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: e.g. macOS 15.6, Windows 11, Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: website
+    attributes:
+      label: Affected website
+      description: If the bug is site-specific, provide the public website URL. Do not share private page URLs.
+      placeholder: e.g. https://example.com
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots, console errors, or other details that may help. Remove sensitive information first.
+

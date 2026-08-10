@@ -7,9 +7,26 @@ describe('i18n', () => {
     expect(translate('en', 'rangeSummary', { minimum: 0.25, maximum: 4, step: 0.25 })).toContain('0.25×')
     expect(translate('zh-TW', 'automatic')).toBe('自動')
     expect(translate('en', 'system')).toBe('Automatic')
-    expect(translate('zh-TW', 'blockedSites')).toBe('封鎖網站')
-    expect(translate('en', 'blockedSiteDuplicate')).toBe('This site is already blocked.')
+    expect(translate('zh-TW', 'siteRules')).toBe('網站規則')
+    expect(translate('zh-TW', 'generalSettings')).toBe('一般')
+    expect(translate('en', 'followGeneralSettings')).toBe('Use general settings')
+    expect(translate('en', 'status')).toBe('Shortcuts')
+    expect(translate('en', 'custom')).toBe('Custom')
+    expect(translate('zh-TW', 'targetSpeed')).toBe('常用速度')
+    expect(translate('zh-TW', 'targetSpeedDescription')).toBe('按下「常用速度」快捷鍵時，直接套用此速度。')
+    expect(translate('zh-TW', 'toggleTargetSpeedTitle')).toBe('常用速度')
+    expect(translate('en', 'blockedSiteDuplicate', { line: 3 })).toBe(
+      'Line 3 duplicates another entry or an existing site.'
+    )
     expect(translate('zh-TW', 'loading')).toBe('載入中…')
+    expect(translate('zh-TW', 'backupRestore')).toBe('備份與還原')
+    expect(translate('zh-TW', 'importPreviewTitle')).toBe('確認匯入設定')
+    expect(translate('zh-TW', 'automaticBrowser')).toBe('自動（跟隨瀏覽器）')
+    expect(translate('zh-TW', 'automaticSystem')).toBe('自動（跟隨系統）')
+    expect(translate('en', 'backupShortcutsValue', { total: 5, enabled: 4 })).toBe(
+      '5 shortcuts (4 enabled)'
+    )
+    expect(translate('en', 'backupSiteRulesValue', { count: 3 })).toBe('3 rules')
   })
 
   it.each([

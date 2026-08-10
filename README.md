@@ -15,8 +15,10 @@ A Manifest V3 browser extension that controls standard HTML5 video elements with
 - Increase speed with `Shift + >` (`Shift + .`); hold to keep increasing.
 - Decrease speed with `Shift + <` (`Shift + ,`); hold to keep decreasing.
 - Reset speed with `Shift + /`.
-- Record custom shortcuts and configure speed range, step, hold speed, and hold delay.
+- Jump directly to a configurable preferred speed with `Shift + "`.
+- Enable or disable individual shortcut actions, record custom keys, and configure speed range, step, target speed, hold speed, and hold delay.
 - Use the popup for quick enable/disable controls, indicator visibility, language, and theme.
+- Configure per-site rules that can disable shortcuts or override the preferred speed and action hints.
 - Detect the interface language automatically, or choose English, Traditional Chinese, Simplified Chinese, Japanese, or Korean; choose System, Light, or Dark theme.
 - Select the playing or most visible video when a page contains multiple videos.
 - Run in website frames where extension content scripts are allowed.
@@ -116,7 +118,8 @@ The reproduced extension is written to `dist/firefox`.
 
 Video Speed Shortcuts does not collect or transmit personal, browsing, technical, or usage data to the developer or third parties. All fonts and application assets are bundled with the extension. See the full [Privacy Policy](PRIVACY.md).
 
-- `storage` stores playback settings, shortcuts, language, theme, and site scope in browser-managed synchronized storage.
+- `storage` stores playback settings, shortcuts, language, theme, and site rules in browser-managed synchronized storage.
+- `scripting` activates the content script in already-open web tabs when the extension is first installed.
 - `<all_urls>` lets playback shortcuts work on standard HTML5 videos across websites and inside permitted frames.
 
 The extension uses shared shadcn-style UI primitives in `src/components/ui` for both the popup and options page. Settings are synchronized through `chrome.storage.sync`, including the selected locale and theme.

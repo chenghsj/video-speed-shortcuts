@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an improvement for Video Speed Shortcuts
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Video Speed Shortcuts. Please describe the need behind your idea so it can be evaluated clearly.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to accomplish, and what makes it difficult today?
+      placeholder: Describe the situation and who would benefit.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: What would you like Video Speed Shortcuts to do?
+      placeholder: Describe your preferred behavior or workflow.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Are there existing settings, shortcuts, extensions, or workarounds you have tried?
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add mockups, examples, affected websites, or other useful details.
+

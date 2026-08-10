@@ -27,7 +27,7 @@ export default defineManifest(({ mode }) => {
       48: 'icons/icon-48.png',
       128: 'icons/icon-128.png',
     },
-    permissions: ['storage'],
+    permissions: ['storage', 'scripting'],
     host_permissions: ['<all_urls>'],
     options_ui: {
       page: 'options.html',

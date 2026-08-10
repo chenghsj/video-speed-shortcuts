@@ -1,4 +1,10 @@
-export const SHORTCUT_ACTIONS = ['holdSpeed', 'speedUp', 'speedDown', 'speedReset'] as const
+export const SHORTCUT_ACTIONS = [
+  'holdSpeed',
+  'toggleTargetSpeed',
+  'speedUp',
+  'speedDown',
+  'speedReset',
+] as const
 
 export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number]
 
@@ -10,6 +16,8 @@ export const THEMES = ['system', 'light', 'dark'] as const
 
 export type Theme = (typeof THEMES)[number]
 
+export const SETTINGS_VERSION = 7 as const
+
 export type KeyBinding = {
   code: string
   key: string
@@ -19,22 +27,26 @@ export type KeyBinding = {
   meta: boolean
 }
 
-export type BlacklistEntry = {
+export type SiteRule = {
   host: string
   enabled: boolean
+  targetSpeed: number | null
+  showIndicator: boolean | null
 }
 
 export type VideoSpeedSettings = {
-  version: 3
+  version: typeof SETTINGS_VERSION
   enabled: boolean
   minimumSpeed: number
   maximumSpeed: number
   speedStep: number
+  targetSpeed: number
   holdSpeed: number
   holdDelayMs: number
   showIndicator: boolean
   locale: Locale
   theme: Theme
   bindings: Record<ShortcutAction, KeyBinding>
-  blacklist: BlacklistEntry[]
+  shortcutEnabled: Record<ShortcutAction, boolean>
+  siteRules: SiteRule[]
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isSiteBlocked, normalizeHostname } from './site-matching'
+import { getSiteRule, isSiteBlocked, normalizeHostname, resolveSitePreferences } from './site-matching'
 
 describe('site matching', () => {
   it('normalizes domains and full URLs', () => {
@@ -15,11 +15,27 @@ describe('site matching', () => {
   })
 
   it('matches the host and its subdomains without matching similar names', () => {
-    const blacklist = [{ host: 'youtube.com', enabled: true }]
+    const siteRules = [{ host: 'youtube.com', enabled: true, targetSpeed: null, showIndicator: null }]
 
-    expect(isSiteBlocked('youtube.com', blacklist)).toBe(true)
-    expect(isSiteBlocked('music.youtube.com', blacklist)).toBe(true)
-    expect(isSiteBlocked('notyoutube.com', blacklist)).toBe(false)
-    expect(isSiteBlocked('youtube.com', [{ host: 'youtube.com', enabled: false }])).toBe(false)
+    expect(isSiteBlocked('youtube.com', siteRules)).toBe(true)
+    expect(isSiteBlocked('music.youtube.com', siteRules)).toBe(true)
+    expect(isSiteBlocked('notyoutube.com', siteRules)).toBe(false)
+    expect(isSiteBlocked('youtube.com', [
+      { host: 'youtube.com', enabled: false, targetSpeed: null, showIndicator: null },
+    ])).toBe(false)
+  })
+
+  it('uses the most specific site rule for blocking and preferences', () => {
+    const rules = [
+      { host: 'example.com', enabled: true, targetSpeed: null, showIndicator: null },
+      { host: 'video.example.com', enabled: false, targetSpeed: 1.5, showIndicator: false },
+    ]
+
+    expect(getSiteRule('watch.video.example.com', rules)?.host).toBe('video.example.com')
+    expect(isSiteBlocked('watch.video.example.com', rules)).toBe(false)
+    expect(resolveSitePreferences('watch.video.example.com', rules, {
+      targetSpeed: 2,
+      showIndicator: true,
+    })).toEqual({ blocked: false, targetSpeed: 1.5, showIndicator: false })
   })
 })

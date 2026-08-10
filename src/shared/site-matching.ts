@@ -1,4 +1,4 @@
-import type { BlacklistEntry } from './types'
+import type { SiteRule } from './types'
 
 const HOSTNAME_PATTERN = /^[a-z0-9.-]+$/i
 const IPV4_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/
@@ -39,10 +39,29 @@ export const normalizeHostname = (value: unknown): string | null => {
   return isValidHostname(host) ? host : null
 }
 
-export const isSiteBlocked = (hostname: string, blacklist: BlacklistEntry[]): boolean => {
+export const isSiteBlocked = (hostname: string, siteRules: SiteRule[]): boolean => {
+  return getSiteRule(hostname, siteRules)?.enabled ?? false
+}
+
+export const getSiteRule = (
+  hostname: string,
+  rules: SiteRule[]
+): SiteRule | null => {
   const host = hostname.toLowerCase().replace(/\.$/, '')
-  return blacklist.some(entry => {
-    if (!entry.enabled) return false
-    return host === entry.host || host.endsWith(`.${entry.host}`)
-  })
+  return rules
+    .filter(entry => host === entry.host || host.endsWith(`.${entry.host}`))
+    .sort((left, right) => right.host.length - left.host.length)[0] ?? null
+}
+
+export const resolveSitePreferences = (
+  hostname: string,
+  rules: SiteRule[],
+  defaults: { targetSpeed: number; showIndicator: boolean }
+): { blocked: boolean; targetSpeed: number; showIndicator: boolean } => {
+  const rule = getSiteRule(hostname, rules)
+  return {
+    blocked: rule?.enabled ?? false,
+    targetSpeed: rule?.targetSpeed ?? defaults.targetSpeed,
+    showIndicator: rule?.showIndicator ?? defaults.showIndicator,
+  }
 }

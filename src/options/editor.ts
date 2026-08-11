@@ -293,7 +293,6 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
             targetSpeed: DEFAULT_SETTINGS.targetSpeed,
             holdSpeed: DEFAULT_SETTINGS.holdSpeed,
             holdDelayMs: DEFAULT_SETTINGS.holdDelayMs,
-            showIndicator: DEFAULT_SETTINGS.showIndicator,
           })
         case 'shortcuts':
           return save(

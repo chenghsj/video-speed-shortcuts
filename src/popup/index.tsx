@@ -355,14 +355,16 @@ const App = () => {
               />
             </div>
           </div>
-          <Separator />
-          <div className="flex items-center justify-between gap-2.5">
-            <div>
-              <p className="text-xs font-medium">{t('indicator')}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t('indicatorDescription')}</p>
-            </div>
-            <Switch checked={settings.showIndicator} onCheckedChange={checked => void updateSettings({ showIndicator: checked })} aria-label={t('indicator')} />
+        </CardContent>
+      </Card>
+
+      <Card className="mt-1.5 bg-card/85 shadow-lg backdrop-blur-xl">
+        <CardContent className="flex min-h-20 items-center justify-between gap-2.5 p-2.5">
+          <div>
+            <p className="text-xs font-semibold">{t('indicator')}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t('indicatorDescription')}</p>
           </div>
+          <Switch checked={settings.showIndicator} onCheckedChange={checked => void updateSettings({ showIndicator: checked })} aria-label={t('indicator')} />
         </CardContent>
       </Card>
 

@@ -223,7 +223,7 @@ describe('settings editor workflow', () => {
       targetSpeed: DEFAULT_SETTINGS.targetSpeed,
       holdSpeed: DEFAULT_SETTINGS.holdSpeed,
       holdDelayMs: DEFAULT_SETTINGS.holdDelayMs,
-      showIndicator: DEFAULT_SETTINGS.showIndicator,
+      showIndicator: false,
     })
     expect(restored.state.settings.enabled).toBe(false)
     expect(restored.state.settings.locale).toBe('en')

@@ -374,13 +374,6 @@ const App = () => {
                     />
                   ))}
                 </div>
-                <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t pt-4">
-                  <div>
-                    <p className="text-sm font-medium">{t('indicator')}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{t('indicatorDescription')}</p>
-                  </div>
-                  <Switch checked={settings.showIndicator} onCheckedChange={checked => patchSettings({ showIndicator: checked })} aria-label={t('indicator')} />
-                </div>
               </section>
             </CardContent>
           </Card>
@@ -399,6 +392,16 @@ const App = () => {
                 </Badge>
               </div>
               <Switch checked={settings.enabled} onCheckedChange={checked => patchSettings({ enabled: checked })} aria-label={t('enabled')} />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/85 backdrop-blur-xl">
+            <CardContent className="flex min-h-20 items-center justify-between gap-4 p-3">
+              <div>
+                <p className="text-sm font-semibold">{t('indicator')}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{t('indicatorDescription')}</p>
+              </div>
+              <Switch checked={settings.showIndicator} onCheckedChange={checked => patchSettings({ showIndicator: checked })} aria-label={t('indicator')} />
             </CardContent>
           </Card>
 

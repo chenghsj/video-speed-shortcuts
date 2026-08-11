@@ -1,6 +1,7 @@
 # Video Speed Shortcuts
 
 [![Release](https://img.shields.io/github/v/release/chenghsj/video-speed-shortcuts?display_name=tag&sort=semver&label=release)](https://github.com/chenghsj/video-speed-shortcuts/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2EA44F)](LICENSE)
 [![Privacy: No data collected](https://img.shields.io/badge/privacy-no_data_collected-2EA44F)](PRIVACY.md)
 ![Manifest V3](https://img.shields.io/badge/manifest-v3-4285F4)
 ![Chromium](https://img.shields.io/badge/Chromium-111%2B-4285F4?logo=googlechrome&logoColor=white)
@@ -129,6 +130,14 @@ Video Speed Shortcuts does not collect or transmit personal, browsing, technical
 - `<all_urls>` lets playback shortcuts work on standard HTML5 videos across websites and inside permitted frames.
 
 The extension uses shared shadcn-style UI primitives in `src/components/ui` for both the popup and options page. Settings are synchronized through `chrome.storage.sync`, including the selected locale and theme.
+
+## Contributing
+
+Bug reports, feature requests, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development and submission workflow. Security vulnerabilities should be reported privately according to [SECURITY.md](SECURITY.md).
+
+## License
+
+Video Speed Shortcuts is open source software licensed under the [MIT License](LICENSE).
 
 ## Browser limitations
 

@@ -75,7 +75,8 @@ jobs:
           if [ "$BROWSER" = firefox ]; then
             zip -r "release/video-speed-shortcuts-$version-firefox-source.zip" \
               src public package.json package-lock.json tsconfig.json vite.config.ts \
-              manifest.config.ts popup.html options.html README.md PRIVACY.md CONTEXT.md
+              manifest.config.ts popup.html options.html README.md PRIVACY.md CONTEXT.md \
+              LICENSE CONTRIBUTING.md SECURITY.md
           fi
 
       - name: Upload store package

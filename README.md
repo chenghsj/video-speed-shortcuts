@@ -71,14 +71,20 @@ The installable ZIP files contain `manifest.json` at their archive root and can 
 
 ### Publish a release
 
-Update the version and create the matching Git tag:
+Create a non-empty, version-specific release notes file first, for example:
+
+```text
+.github/release-notes/v0.1.1.md
+```
+
+Then update the version and create the matching Git tag:
 
 ```sh
 npm version 0.1.1
 git push origin HEAD --follow-tags
 ```
 
-Replace `0.1.1` with the intended version. A tag such as `v0.1.1` must match the version in `package.json`. Pushing the tag runs tests, typechecking, browser-specific manifest validation, Firefox `web-ext` linting, and packaging. It then creates a GitHub Release containing:
+Replace `0.1.1` with the intended version. A tag such as `v0.1.1` must match the version in `package.json`, and `.github/release-notes/v0.1.1.md` must exist and contain the release description. Pushing the tag runs tests, typechecking, browser-specific manifest validation, Firefox `web-ext` linting, and packaging. The workflow fails instead of publishing an undocumented release when the notes file is missing or empty. It then creates a GitHub Release containing:
 
 - `video-speed-shortcuts-<version>-chromium.zip`
 - `video-speed-shortcuts-<version>-firefox.zip`

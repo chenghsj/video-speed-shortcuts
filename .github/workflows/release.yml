@@ -120,6 +120,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Download release files
         uses: actions/download-artifact@v4
         with:
@@ -130,9 +133,22 @@ jobs:
       - name: Create release and attach packages
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG_VERSION: ${{ github.ref_name }}
         run: |
-          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" release/*.zip release/SHA256SUMS --repo "${{ github.repository }}" --clobber
+          set -Eeuo pipefail
+
+          notes_file=".github/release-notes/$TAG_VERSION.md"
+          if [[ ! -s "$notes_file" ]]; then
+            printf 'Missing release notes: %s\n' "$notes_file" >&2
+            exit 1
+          fi
+
+          if gh release view "$TAG_VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit "$TAG_VERSION" --repo "$GITHUB_REPOSITORY" --notes-file "$notes_file"
+            gh release upload "$TAG_VERSION" release/*.zip release/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "${{ github.ref_name }}" release/*.zip release/SHA256SUMS --repo "${{ github.repository }}" --generate-notes --verify-tag
+            gh release create "$TAG_VERSION" release/*.zip release/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" \
+              --notes-file "$notes_file" \
+              --verify-tag
           fi

@@ -73,6 +73,7 @@ export const createContentShortcutRuntime = (
   let settings = initialSettings
   let settingsReady = false
   let holdState: HoldState | null = null
+  let consumedHoldKeyupCode: string | null = null
   let nextHoldId = 1
 
   const restoreActiveHold = (current: HoldState): RuntimeEffect[] => {
@@ -119,9 +120,14 @@ export const createContentShortcutRuntime = (
 
   const completeHold = (code: string): RuntimeEffect[] => {
     const current = holdState
-    if (!current || current.bindingCode !== code) return []
+    if (!current || current.bindingCode !== code) {
+      if (consumedHoldKeyupCode !== code) return []
+      consumedHoldKeyupCode = null
+      return [{ type: 'intercept' }]
+    }
 
     holdState = null
+    consumedHoldKeyupCode = null
     const effects: RuntimeEffect[] = [
       { type: 'intercept' },
       { type: 'cancel-hold', holdId: current.id },
@@ -168,12 +174,35 @@ export const createContentShortcutRuntime = (
       return []
     }
 
-    if (holdState && matches('holdSpeed')) {
+    if (holdState && input.binding.code === holdState.bindingCode) {
       return [{ type: 'intercept' }]
     }
 
-    if (holdState && matches('toggleTargetSpeed')) {
-      return [{ type: 'intercept' }]
+    if (
+      holdState &&
+      (matches('speedUp') ||
+        matches('speedDown') ||
+        matches('speedReset') ||
+        matches('toggleTargetSpeed'))
+    ) {
+      const current = holdState
+      consumedHoldKeyupCode = current.bindingCode
+      const effects = restoreHold()
+      const restoredVideo: RuntimeVideo = {
+        ...current.video,
+        playbackRate: current.originalSpeed,
+        paused: current.wasPaused,
+      }
+      const replacementVideo =
+        input.video?.element === current.video.element ? restoredVideo : input.video
+
+      return [
+        ...effects,
+        ...handleKeydown({
+          ...input,
+          video: replacementVideo,
+        }),
+      ]
     }
 
     const video = input.video
@@ -225,8 +254,11 @@ export const createContentShortcutRuntime = (
         return completeHold(input.code)
       case 'hold-delay-elapsed':
         return activateHold(input.holdId)
-      case 'focus-lost':
-        return restoreHold()
+      case 'focus-lost': {
+        const effects = restoreHold()
+        consumedHoldKeyupCode = null
+        return effects
+      }
       case 'settings-changed': {
         const effects = [...restoreHold(), { type: 'hide-indicator' } as RuntimeEffect]
         settings = input.settings

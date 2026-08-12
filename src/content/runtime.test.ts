@@ -103,13 +103,109 @@ describe('content shortcut runtime', () => {
     ])
   })
 
-  it('ignores target-speed toggles while the hold interaction owns playback', () => {
+  it('lets a speed shortcut replace a pending hold interaction', () => {
     const runtime = readyRuntime()
     runtime.dispatch(keydown('holdSpeed'))
 
     expect(runtime.dispatch(keydown('toggleTargetSpeed'))).toEqual([
+      { type: 'cancel-hold', holdId: 1 },
+      { type: 'intercept' },
+      {
+        type: 'set-speed',
+        video,
+        speed: 2,
+        showIndicator: true,
+        persistIndicator: false,
+        updateDefaultPlaybackRate: true,
+      },
+    ])
+    expect(runtime.dispatch({ type: 'keyup', code: 'Space' })).toEqual([
       { type: 'intercept' },
     ])
+    expect(runtime.dispatch({ type: 'keyup', code: 'Space' })).toEqual([])
+  })
+
+  it('restores an active hold before applying its replacement speed shortcut', () => {
+    const runtime = readyRuntime()
+    runtime.dispatch(keydown('holdSpeed'))
+    runtime.dispatch({ type: 'hold-delay-elapsed', holdId: 1 })
+
+    const heldVideo = { ...video, playbackRate: 2, paused: false }
+    const restoredVideo = { ...video, playbackRate: 1, paused: true }
+    expect(runtime.dispatch(keydown('speedUp', { video: heldVideo }))).toEqual([
+      { type: 'cancel-hold', holdId: 1 },
+      {
+        type: 'set-speed',
+        video,
+        speed: 1,
+        showIndicator: false,
+        persistIndicator: false,
+        updateDefaultPlaybackRate: false,
+      },
+      { type: 'pause', video },
+      { type: 'hide-indicator' },
+      { type: 'intercept' },
+      {
+        type: 'set-speed',
+        video: restoredVideo,
+        speed: 1.25,
+        showIndicator: true,
+        persistIndicator: false,
+        updateDefaultPlaybackRate: true,
+      },
+    ])
+    expect(runtime.dispatch({ type: 'keyup', code: 'Space' })).toEqual([
+      { type: 'intercept' },
+    ])
+  })
+
+  it('applies a replacement speed shortcut to the current active video', () => {
+    const runtime = readyRuntime()
+    runtime.dispatch(keydown('holdSpeed'))
+    runtime.dispatch({ type: 'hold-delay-elapsed', holdId: 1 })
+
+    const activeVideo: RuntimeVideo = {
+      element: {} as HTMLVideoElement,
+      playbackRate: 1.5,
+      paused: false,
+    }
+    expect(runtime.dispatch(keydown('speedUp', { video: activeVideo }))).toEqual([
+      { type: 'cancel-hold', holdId: 1 },
+      {
+        type: 'set-speed',
+        video,
+        speed: 1,
+        showIndicator: false,
+        persistIndicator: false,
+        updateDefaultPlaybackRate: false,
+      },
+      { type: 'pause', video },
+      { type: 'hide-indicator' },
+      { type: 'intercept' },
+      {
+        type: 'set-speed',
+        video: activeVideo,
+        speed: 1.75,
+        showIndicator: true,
+        persistIndicator: false,
+        updateDefaultPlaybackRate: true,
+      },
+    ])
+  })
+
+  it('intercepts repeated hold keydowns after a modifier changes', () => {
+    const runtime = readyRuntime()
+    runtime.dispatch(keydown('holdSpeed'))
+    runtime.dispatch({ type: 'hold-delay-elapsed', holdId: 1 })
+
+    expect(
+      runtime.dispatch(
+        keydown('holdSpeed', {
+          binding: { ...DEFAULT_SETTINGS.bindings.holdSpeed, shift: true },
+          repeat: true,
+        })
+      )
+    ).toEqual([{ type: 'intercept' }])
   })
 
   it('models short press and long press as separate hold transitions', () => {

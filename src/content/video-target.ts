@@ -15,7 +15,59 @@ const scoreVideo = (video: HTMLVideoElement): number => {
   return playing + hasFrame + visibleArea(video)
 }
 
-export const findActiveVideo = (targetDocument: Document = document): HTMLVideoElement | null =>
-  Array.from(targetDocument.querySelectorAll<HTMLVideoElement>('video')).reduce<
-    HTMLVideoElement | null
-  >((best, video) => (!best || scoreVideo(video) > scoreVideo(best) ? video : best), null)
+type ShadowRootCache = {
+  roots: ShadowRoot[]
+  refreshedAt: number
+}
+
+const SHADOW_ROOT_REFRESH_INTERVAL_MS = 500
+const shadowRootsByDocument = new WeakMap<Document, ShadowRootCache>()
+
+const discoverShadowRoots = (root: Document | ShadowRoot): ShadowRoot[] => {
+  const shadowRoots: ShadowRoot[] = []
+
+  for (const element of root.querySelectorAll<HTMLElement>('*')) {
+    if (!element.shadowRoot) continue
+    shadowRoots.push(element.shadowRoot, ...discoverShadowRoots(element.shadowRoot))
+  }
+
+  return shadowRoots
+}
+
+const refreshShadowRootCache = (targetDocument: Document): ShadowRootCache => {
+  const cache: ShadowRootCache = {
+    roots: discoverShadowRoots(targetDocument),
+    refreshedAt: Date.now(),
+  }
+
+  shadowRootsByDocument.set(targetDocument, cache)
+  return cache
+}
+
+const findVideos = (targetDocument: Document, refreshShadowRoots: boolean): HTMLVideoElement[] => {
+  let cache = shadowRootsByDocument.get(targetDocument)
+  if (
+    refreshShadowRoots ||
+    !cache ||
+    Date.now() - cache.refreshedAt >= SHADOW_ROOT_REFRESH_INTERVAL_MS ||
+    cache.roots.some(root => !root.host.isConnected)
+  ) {
+    cache = refreshShadowRootCache(targetDocument)
+  }
+
+  const roots = cache.roots.filter(
+    root => root.host.isConnected
+  )
+  return [targetDocument, ...roots].flatMap(root =>
+    Array.from(root.querySelectorAll<HTMLVideoElement>('video'))
+  )
+}
+
+export const findActiveVideo = (
+  targetDocument: Document = document,
+  refreshShadowRoots = true
+): HTMLVideoElement | null =>
+  findVideos(targetDocument, refreshShadowRoots).reduce<HTMLVideoElement | null>(
+    (best, video) => (!best || scoreVideo(video) > scoreVideo(best) ? video : best),
+    null
+  )

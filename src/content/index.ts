@@ -6,24 +6,16 @@ import { claimContentScriptInitialization } from './bootstrap'
 import { hideIndicator, showIndicator, showPlaybackHint } from './indicator'
 import {
   createContentShortcutRuntime,
+  shouldResolveShortcutTarget,
   type RuntimeEffect,
   type RuntimeInput,
   type RuntimeVideo,
 } from './runtime'
 import { findActiveVideo } from './video-target'
+import { isTypingTarget } from './typing-target'
 
 const runtime = createContentShortcutRuntime()
 const holdTimers = new Map<number, number>()
-
-const isTypingTarget = (event: KeyboardEvent): boolean => {
-  const target = event.composedPath()[0]
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  )
-}
 
 const toRuntimeVideo = (video: HTMLVideoElement | null): RuntimeVideo | null =>
   video
@@ -107,13 +99,21 @@ const settingsReadyInput = (settings: VideoSpeedSettings): RuntimeInput => ({
 })
 
 const handleKeydown = (event: KeyboardEvent): void => {
+  const binding = bindingFromEvent(event)
+  const typingTarget = isTypingTarget(event)
+  const shouldResolveTarget = shouldResolveShortcutTarget(
+    currentSettings,
+    binding,
+    typingTarget,
+    currentSiteBlocked
+  )
   const input: RuntimeInput = {
     type: 'keydown',
-    binding: bindingFromEvent(event),
+    binding,
     repeat: event.repeat,
-    isTypingTarget: isTypingTarget(event),
+    isTypingTarget: typingTarget,
     isSiteBlocked: currentSiteBlocked,
-    video: toRuntimeVideo(findActiveVideo()),
+    video: toRuntimeVideo(shouldResolveTarget ? findActiveVideo(document, !event.repeat) : null),
   }
   applyEffects(runtime.dispatch(input), event)
 }

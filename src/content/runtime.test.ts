@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../shared/settings'
-import { createContentShortcutRuntime, type RuntimeInput, type RuntimeVideo } from './runtime'
+import {
+  createContentShortcutRuntime,
+  shouldResolveShortcutTarget,
+  type RuntimeInput,
+  type RuntimeVideo,
+} from './runtime'
 
 const videoElement = {} as HTMLVideoElement
 const video: RuntimeVideo = { element: videoElement, playbackRate: 1, paused: true }
@@ -22,6 +27,41 @@ const keydown = (
   isSiteBlocked: false,
   video,
   ...overrides,
+})
+
+describe('shortcut target resolution', () => {
+  it('only resolves a target for an enabled shortcut outside blocked or typing contexts', () => {
+    const regularKey = {
+      code: 'KeyA',
+      key: 'a',
+      ctrl: false,
+      alt: false,
+      shift: false,
+      meta: false,
+    }
+
+    expect(shouldResolveShortcutTarget(DEFAULT_SETTINGS, regularKey, false, false)).toBe(false)
+    expect(
+      shouldResolveShortcutTarget(DEFAULT_SETTINGS, DEFAULT_SETTINGS.bindings.speedUp, false, false)
+    ).toBe(true)
+    expect(
+      shouldResolveShortcutTarget(DEFAULT_SETTINGS, DEFAULT_SETTINGS.bindings.speedUp, true, false)
+    ).toBe(false)
+    expect(
+      shouldResolveShortcutTarget(DEFAULT_SETTINGS, DEFAULT_SETTINGS.bindings.speedUp, false, true)
+    ).toBe(false)
+    expect(
+      shouldResolveShortcutTarget(
+        {
+          ...DEFAULT_SETTINGS,
+          shortcutEnabled: { ...DEFAULT_SETTINGS.shortcutEnabled, speedUp: false },
+        },
+        DEFAULT_SETTINGS.bindings.speedUp,
+        false,
+        false
+      )
+    ).toBe(false)
+  })
 })
 
 describe('content shortcut runtime', () => {

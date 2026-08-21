@@ -1,7 +1,7 @@
 import { bindingsEqual } from '../shared/keys'
 import { DEFAULT_SETTINGS } from '../shared/settings'
 import { resolveNextSpeed } from '../shared/speed'
-import type { KeyBinding, VideoSpeedSettings } from '../shared/types'
+import { SHORTCUT_ACTIONS, type KeyBinding, type VideoSpeedSettings } from '../shared/types'
 
 export type RuntimeVideo = {
   element: HTMLVideoElement
@@ -52,6 +52,19 @@ type HoldState = {
 export type ContentShortcutRuntime = {
   dispatch: (input: RuntimeInput) => RuntimeEffect[]
 }
+
+export const shouldResolveShortcutTarget = (
+  settings: VideoSpeedSettings,
+  binding: KeyBinding,
+  isTypingTarget: boolean,
+  isSiteBlocked: boolean
+): boolean =>
+  settings.enabled &&
+  !isTypingTarget &&
+  !isSiteBlocked &&
+  SHORTCUT_ACTIONS.some(
+    action => settings.shortcutEnabled[action] && bindingsEqual(binding, settings.bindings[action])
+  )
 
 const setSpeedEffect = (
   settings: VideoSpeedSettings,
@@ -175,6 +188,10 @@ export const createContentShortcutRuntime = (
     }
 
     if (holdState && input.binding.code === holdState.bindingCode) {
+      return [{ type: 'intercept' }]
+    }
+
+    if (consumedHoldKeyupCode === input.binding.code) {
       return [{ type: 'intercept' }]
     }
 

@@ -1,11 +1,15 @@
 # Video Speed Shortcuts
 
-[![Release](https://img.shields.io/github/v/release/chenghsj/video-speed-shortcuts?display_name=tag&sort=semver&label=release)](https://github.com/chenghsj/video-speed-shortcuts/releases/latest)
+[![Release](https://img.shields.io/github/v/release/chenghsj/video-speed-shortcuts?display_name=tag&sort=semver&label=release&logo=github&logoColor=white)](https://github.com/chenghsj/video-speed-shortcuts/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2EA44F)](LICENSE)
 [![Privacy: No data collected](https://img.shields.io/badge/privacy-no_data_collected-2EA44F)](PRIVACY.md)
 ![Manifest V3](https://img.shields.io/badge/manifest-v3-4285F4)
 ![Chromium](https://img.shields.io/badge/Chromium-111%2B-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-142%2B-FF7139?logo=firefoxbrowser&logoColor=white)
+
+[![Chrome Web Store](https://img.shields.io/badge/Chrome-Install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/video-speed-shortcuts/bpeaikhaccabhfijfgijmgbmjbbhipjg)
+[![Microsoft Edge Add-ons](docs/assets/edge.svg)](https://microsoftedge.microsoft.com/addons/detail/video-speed-shortcuts/doffmlcohipbjamkfdeaamnlbfjcegob)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox-Install-FF7139?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/firefox/addon/video-speed-shortcuts/)
 
 A Manifest V3 browser extension that controls standard HTML5 video elements without relying on Netflix or other site-specific APIs. Store packages are built for Chromium and Firefox.
 

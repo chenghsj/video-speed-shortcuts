@@ -101,6 +101,8 @@ export const useSettingsEditor = () => {
       dispatch({ type: 'toggle-site-rule', host, enabled }),
     patchSiteRule: (host: string, changes: Partial<Omit<SiteRule, 'host'>>) =>
       dispatch({ type: 'patch-site-rule', host, changes }),
+    patchSiteRules: (hosts: string[], changes: Partial<Omit<SiteRule, 'host'>>) =>
+      dispatch({ type: 'patch-site-rules', hosts, changes }),
     removeSiteRules: (hosts: string[]) => dispatch({ type: 'remove-site-rules', hosts }),
     resetSection: (section: EditorSection) => dispatch({ type: 'reset-section', section }),
     patchSettings: (changes: Partial<VideoSpeedSettings>) =>

@@ -65,6 +65,7 @@ export type EditorEvent =
   | { type: 'add-site-rules'; rule?: NewSiteRule }
   | { type: 'toggle-site-rule'; host: string; enabled: boolean }
   | { type: 'patch-site-rule'; host: string; changes: Partial<Omit<SiteRule, 'host'>> }
+  | { type: 'patch-site-rules'; hosts: string[]; changes: Partial<Omit<SiteRule, 'host'>> }
   | { type: 'remove-site-rules'; hosts: string[] }
   | { type: 'save-succeeded'; siteRulesDraft?: string }
   | { type: 'save-failed' }
@@ -250,6 +251,16 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
           entry.host === event.host ? { ...entry, ...event.changes } : entry
         ),
       }))
+    case 'patch-site-rules': {
+      if (event.hosts.length === 0) return { state }
+      const hosts = new Set(event.hosts)
+      return save(state, normalizeSettings({
+        ...state.settings,
+        siteRules: state.settings.siteRules.map(entry =>
+          hosts.has(entry.host) ? { ...entry, ...event.changes } : entry
+        ),
+      }))
+    }
     case 'remove-site-rules':
       if (event.hosts.length === 0) return { state }
       {

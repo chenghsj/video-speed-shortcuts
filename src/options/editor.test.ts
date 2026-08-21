@@ -133,6 +133,17 @@ describe('settings editor workflow', () => {
       showIndicator: false,
     })
 
+    const batchEdited = reduceEditor(customized.state, {
+      type: 'patch-site-rules',
+      hosts: ['youtube.com', 'example.com'],
+      changes: { enabled: true, targetSpeed: 1.75, showIndicator: true },
+    })
+    expect(batchEdited.state.settings.siteRules).toEqual([
+      { host: 'example.com', enabled: true, targetSpeed: 1.75, showIndicator: true },
+      { host: 'youtube.com', enabled: true, targetSpeed: 1.75, showIndicator: true },
+    ])
+    expect(batchEdited.effect).toEqual({ type: 'save', settings: batchEdited.state.settings })
+
     const configured = reduceEditor(
       reduceEditor(createEditorState(), {
         type: 'set-site-rules-draft',

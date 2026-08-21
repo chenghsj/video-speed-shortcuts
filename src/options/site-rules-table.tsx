@@ -38,7 +38,14 @@ import { Textarea } from '../components/ui/textarea'
 import type { TranslationKey } from '../shared/i18n'
 import { NUMERIC_SETTING_CONSTRAINTS } from '../shared/numeric-settings'
 import type { SiteRule } from '../shared/types'
+import { BatchEditSiteRulesDialog } from './batch-edit-site-rules-dialog'
 import type { EditorSiteRuleError, NewSiteRule } from './editor'
+import {
+  createNewSiteRule,
+  createSiteRuleSettingsDraft,
+  isSiteRuleSettingsDraftValid,
+  SiteRuleSettingsEditor,
+} from './site-rule-settings-editor'
 
 type Translate = (key: TranslationKey, values?: Record<string, string | number>) => string
 type StatusFilter = 'all' | 'active' | 'disabled'
@@ -56,6 +63,7 @@ type SiteRulesTableProps = {
   onAdd: (rule: NewSiteRule) => void
   onToggle: (host: string, enabled: boolean) => void
   onPatch: (host: string, changes: Partial<Omit<SiteRule, 'host'>>) => void
+  onPatchMany: (hosts: string[], changes: Partial<Omit<SiteRule, 'host'>>) => void
   onRemove: (hosts: string[]) => void
 }
 
@@ -174,6 +182,22 @@ const SortIcon = ({ active, direction }: { active: boolean; direction: SortDirec
     : <ChevronDown aria-hidden="true" className="size-3.5" />
 }
 
+const createNewRuleSettingsDraft = (globalTargetSpeed: number) =>
+  createSiteRuleSettingsDraft(
+    { enabled: false, targetSpeed: null, showIndicator: null },
+    globalTargetSpeed
+  )
+
+export const getSelectedSiteRules = (
+  entries: SiteRule[],
+  selectedHosts: Iterable<string>
+): SiteRule[] => {
+  const entriesByHost = new Map(entries.map(entry => [entry.host, entry]))
+  return [...selectedHosts]
+    .map(host => entriesByHost.get(host))
+    .filter((entry): entry is SiteRule => Boolean(entry))
+}
+
 export const SiteRulesTable = ({
   entries,
   minimumSpeed,
@@ -185,6 +209,7 @@ export const SiteRulesTable = ({
   onAdd,
   onToggle,
   onPatch,
+  onPatchMany,
   onRemove,
 }: SiteRulesTableProps) => {
   const [query, setQuery] = useState('')
@@ -193,11 +218,11 @@ export const SiteRulesTable = ({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [isEditing, setIsEditing] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
-  const [newShortcutsEnabled, setNewShortcutsEnabled] = useState(true)
-  const [newSpeedMode, setNewSpeedMode] = useState<'inherit' | 'custom'>('inherit')
-  const [newTargetSpeedDraft, setNewTargetSpeedDraft] = useState(String(globalTargetSpeed))
-  const [newIndicator, setNewIndicator] = useState<'inherit' | 'show' | 'hide'>('inherit')
+  const [newRuleSettings, setNewRuleSettings] = useState(() =>
+    createNewRuleSettingsDraft(globalTargetSpeed)
+  )
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false)
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false)
   const [selectedHosts, setSelectedHosts] = useState<Set<string>>(() => new Set())
   const previousEntryCount = useRef(entries.length)
 
@@ -208,10 +233,11 @@ export const SiteRulesTable = ({
   useEffect(() => {
     if (entries.length > previousEntryCount.current) {
       setIsAddOpen(false)
-      setNewShortcutsEnabled(true)
-      setNewSpeedMode('inherit')
-      setNewTargetSpeedDraft(String(globalTargetSpeed))
-      setNewIndicator('inherit')
+      setIsEditing(false)
+      setIsBatchEditOpen(false)
+      setSelectedHosts(new Set())
+      setIsDeleteConfirming(false)
+      setNewRuleSettings(createNewRuleSettingsDraft(globalTargetSpeed))
     }
     previousEntryCount.current = entries.length
   }, [entries.length, globalTargetSpeed])
@@ -238,6 +264,7 @@ export const SiteRulesTable = ({
 
   const visibleHosts = filteredEntries.map(entry => entry.host)
   const selectedCount = selectedHosts.size
+  const selectedEntries = getSelectedSiteRules(entries, selectedHosts)
   const allVisibleSelected = visibleHosts.length > 0
     && visibleHosts.every(host => selectedHosts.has(host))
   const someVisibleSelected = visibleHosts.some(host => selectedHosts.has(host))
@@ -259,6 +286,7 @@ export const SiteRulesTable = ({
 
   const exitEditing = () => {
     setIsEditing(false)
+    setIsBatchEditOpen(false)
     setSelectedHosts(new Set())
     setIsDeleteConfirming(false)
   }
@@ -288,17 +316,13 @@ export const SiteRulesTable = ({
   const closeAddDialog = () => {
     setIsAddOpen(false)
     onDraftChange('')
-    setNewShortcutsEnabled(true)
-    setNewSpeedMode('inherit')
-    setNewTargetSpeedDraft(String(globalTargetSpeed))
-    setNewIndicator('inherit')
+    setNewRuleSettings(createNewRuleSettingsDraft(globalTargetSpeed))
   }
 
-  const customTargetSpeed = Number(newTargetSpeedDraft)
-  const customTargetSpeedIsValid = Number.isFinite(customTargetSpeed)
-    && customTargetSpeed >= minimumSpeed
-    && customTargetSpeed <= maximumSpeed
-  const customTargetSpeedIsRequired = newShortcutsEnabled && newSpeedMode === 'custom'
+  const newRuleSettingsAreValid = isSiteRuleSettingsDraftValid(
+    newRuleSettings,
+    minimumSpeed
+  )
 
   return (
     <>
@@ -351,8 +375,7 @@ export const SiteRulesTable = ({
                     className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => {
                       onRemove([...selectedHosts])
-                      setSelectedHosts(new Set())
-                      setIsDeleteConfirming(false)
+                      exitEditing()
                     }}
                     aria-label={t('confirm')}
                     title={t('confirm')}
@@ -362,9 +385,15 @@ export const SiteRulesTable = ({
                 </div>
               ) : (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => setIsAddOpen(true)}>
-                    <Plus aria-hidden="true" className="size-3.5" />
-                    {t('add')}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={selectedCount === 0}
+                    onClick={() => setIsBatchEditOpen(true)}
+                    aria-label={t('editSelectedSites', { count: selectedCount })}
+                  >
+                    <Pencil aria-hidden="true" className="size-3.5" />
+                    {t('edit')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -601,14 +630,8 @@ export const SiteRulesTable = ({
             className="grid gap-4"
             onSubmit={event => {
               event.preventDefault()
-              if (customTargetSpeedIsRequired && !customTargetSpeedIsValid) return
-              onAdd({
-                enabled: !newShortcutsEnabled,
-                targetSpeed: customTargetSpeedIsRequired ? customTargetSpeed : null,
-                showIndicator: !newShortcutsEnabled || newIndicator === 'inherit'
-                  ? null
-                  : newIndicator === 'show',
-              })
+              if (!newRuleSettingsAreValid) return
+              onAdd(createNewSiteRule(newRuleSettings))
             }}
           >
             <DialogHeader>
@@ -638,83 +661,18 @@ export const SiteRulesTable = ({
                 </p>
               ) : null}
             </div>
-            <div className="grid gap-3 rounded-lg border p-3">
-              <div className="flex min-h-10 items-center justify-between gap-4">
-                <div>
-                  <Label htmlFor="new-site-shortcuts">{t('siteShortcuts')}</Label>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {t('siteShortcutsDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="new-site-shortcuts"
-                  checked={newShortcutsEnabled}
-                  onCheckedChange={setNewShortcutsEnabled}
-                />
-              </div>
-
-              <div className={!newShortcutsEnabled ? 'opacity-45' : ''}>
-                <Label htmlFor="new-site-speed-mode">{t('targetSpeed')}</Label>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <Select
-                    disabled={!newShortcutsEnabled}
-                    value={newSpeedMode}
-                    onValueChange={value => setNewSpeedMode(value as 'inherit' | 'custom')}
-                  >
-                    <SelectTrigger id="new-site-speed-mode" className="h-9 flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="inherit">{t('followGeneralSettings')}</SelectItem>
-                      <SelectItem value="custom">{t('custom')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {newSpeedMode === 'custom' ? (
-                    <Input
-                      type="number"
-                      min={minimumSpeed}
-                      max={maximumSpeed}
-                      step={0.05}
-                      value={newTargetSpeedDraft}
-                      disabled={!newShortcutsEnabled}
-                      aria-label={t('targetSpeed')}
-                      aria-invalid={!customTargetSpeedIsValid}
-                      className="h-9 w-28"
-                      onChange={event => setNewTargetSpeedDraft(event.target.value)}
-                      onWheel={event => event.currentTarget.blur()}
-                    />
-                  ) : null}
-                </div>
-                {customTargetSpeedIsRequired && !customTargetSpeedIsValid ? (
-                  <p className="mt-1.5 text-xs text-destructive" role="alert">
-                    {t('siteTargetSpeedInvalid', { minimum: minimumSpeed, maximum: maximumSpeed })}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className={!newShortcutsEnabled ? 'opacity-45' : ''}>
-                <Label htmlFor="new-site-indicator">{t('indicator')}</Label>
-                <Select
-                  disabled={!newShortcutsEnabled}
-                  value={newIndicator}
-                  onValueChange={value => setNewIndicator(value as 'inherit' | 'show' | 'hide')}
-                >
-                  <SelectTrigger id="new-site-indicator" className="mt-1.5 h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="inherit">{t('followGeneralSettings')}</SelectItem>
-                    <SelectItem value="show">{t('show')}</SelectItem>
-                    <SelectItem value="hide">{t('hide')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <SiteRuleSettingsEditor
+              idPrefix="new-site"
+              draft={newRuleSettings}
+              minimumSpeed={minimumSpeed}
+              t={t}
+              onChange={setNewRuleSettings}
+            />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeAddDialog}>{t('cancel')}</Button>
               <Button
                 type="submit"
-                disabled={customTargetSpeedIsRequired && !customTargetSpeedIsValid}
+                disabled={!newRuleSettingsAreValid}
               >
                 {t('addSiteRules')}
               </Button>
@@ -722,6 +680,20 @@ export const SiteRulesTable = ({
           </form>
         </DialogContent>
       </Dialog>
+
+      {isBatchEditOpen && selectedEntries.length > 0 ? (
+        <BatchEditSiteRulesDialog
+          entries={selectedEntries}
+          minimumSpeed={minimumSpeed}
+          globalTargetSpeed={globalTargetSpeed}
+          t={t}
+          onClose={() => setIsBatchEditOpen(false)}
+          onApply={changes => {
+            onPatchMany(selectedEntries.map(entry => entry.host), changes)
+            exitEditing()
+          }}
+        />
+      ) : null}
     </>
   )
 }

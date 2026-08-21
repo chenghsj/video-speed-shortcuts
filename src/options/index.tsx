@@ -142,6 +142,7 @@ const App = () => {
     addSiteRules,
     toggleSiteRule,
     patchSiteRule,
+    patchSiteRules,
     removeSiteRules,
     resetSection,
     patchSettings,
@@ -466,6 +467,7 @@ const App = () => {
           onAdd={addSiteRules}
           onToggle={toggleSiteRule}
           onPatch={patchSiteRule}
+          onPatchMany={patchSiteRules}
           onRemove={removeSiteRules}
         />
       </main>

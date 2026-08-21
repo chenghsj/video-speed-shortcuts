@@ -76,10 +76,10 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ speedStep: 0 }).speedStep).toBe(0.05)
   })
 
-  it('keeps target speed inside the configured playback range', () => {
-    expect(normalizeSettings({ minimumSpeed: 0.5, maximumSpeed: 2, targetSpeed: 0.25 }).targetSpeed).toBe(0.5)
-    expect(normalizeSettings({ minimumSpeed: 0.5, maximumSpeed: 2, targetSpeed: 3 }).targetSpeed).toBe(2)
-    expect(normalizeSettings({ maximumSpeed: 1.5 }).targetSpeed).toBe(1.5)
+  it('allows target speed above the step-adjustment maximum', () => {
+    expect(normalizeSettings({ minimumSpeed: 0.5, maximumSpeed: 2, targetSpeed: 0.05 }).targetSpeed).toBe(0.5)
+    expect(normalizeSettings({ minimumSpeed: 0.5, maximumSpeed: 2, targetSpeed: 3 }).targetSpeed).toBe(3)
+    expect(normalizeSettings({ maximumSpeed: 1.5, targetSpeed: 99 }).targetSpeed).toBe(4)
   })
 
   it('keeps locale and theme values safe for older or invalid storage', () => {
@@ -109,7 +109,7 @@ describe('normalizeSettings', () => {
     })
 
     expect(settings.siteRules).toEqual([
-      { host: 'youtube.com', enabled: true, targetSpeed: 2, showIndicator: false },
+      { host: 'youtube.com', enabled: true, targetSpeed: 4, showIndicator: false },
       { host: 'z.example.com', enabled: true, targetSpeed: null, showIndicator: null },
       { host: 'a.example.com', enabled: false, targetSpeed: null, showIndicator: null },
     ])

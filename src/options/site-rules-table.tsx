@@ -36,6 +36,7 @@ import {
 } from '../components/ui/table'
 import { Textarea } from '../components/ui/textarea'
 import type { TranslationKey } from '../shared/i18n'
+import { NUMERIC_SETTING_CONSTRAINTS } from '../shared/numeric-settings'
 import type { SiteRule } from '../shared/types'
 import type { EditorSiteRuleError, NewSiteRule } from './editor'
 
@@ -47,7 +48,6 @@ type SortDirection = 'asc' | 'desc'
 type SiteRulesTableProps = {
   entries: SiteRule[]
   minimumSpeed: number
-  maximumSpeed: number
   globalTargetSpeed: number
   draft: string
   error: EditorSiteRuleError | null
@@ -62,7 +62,6 @@ type SiteRulesTableProps = {
 const RuleSpeedInput = ({
   entry,
   minimumSpeed,
-  maximumSpeed,
   globalTargetSpeed,
   inheritLabel,
   label,
@@ -71,7 +70,6 @@ const RuleSpeedInput = ({
 }: {
   entry: SiteRule
   minimumSpeed: number
-  maximumSpeed: number
   globalTargetSpeed: number
   inheritLabel: string
   label: string
@@ -88,7 +86,7 @@ const RuleSpeedInput = ({
     <Input
       type="number"
       min={minimumSpeed}
-      max={maximumSpeed}
+      max={NUMERIC_SETTING_CONSTRAINTS.targetSpeed.max}
       step={0.05}
       value={draft}
       placeholder={`${inheritLabel} · ${globalTargetSpeed}×`}
@@ -115,14 +113,12 @@ const RuleSpeedInput = ({
 const RuleSpeedControl = ({
   entry,
   minimumSpeed,
-  maximumSpeed,
   globalTargetSpeed,
   t,
   onPatch,
 }: {
   entry: SiteRule
   minimumSpeed: number
-  maximumSpeed: number
   globalTargetSpeed: number
   t: Translate
   onPatch: (changes: Partial<Omit<SiteRule, 'host'>>) => void
@@ -147,7 +143,6 @@ const RuleSpeedControl = ({
       <RuleSpeedInput
         entry={entry}
         minimumSpeed={minimumSpeed}
-        maximumSpeed={maximumSpeed}
         globalTargetSpeed={globalTargetSpeed}
         inheritLabel={t('followGeneralSettings')}
         label={t('targetSpeed')}
@@ -182,7 +177,6 @@ const SortIcon = ({ active, direction }: { active: boolean; direction: SortDirec
 export const SiteRulesTable = ({
   entries,
   minimumSpeed,
-  maximumSpeed,
   globalTargetSpeed,
   draft,
   error,
@@ -557,7 +551,6 @@ export const SiteRulesTable = ({
                           <RuleSpeedControl
                             entry={entry}
                             minimumSpeed={minimumSpeed}
-                            maximumSpeed={maximumSpeed}
                             globalTargetSpeed={globalTargetSpeed}
                             t={t}
                             onPatch={changes => onPatch(entry.host, changes)}

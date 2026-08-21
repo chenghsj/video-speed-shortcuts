@@ -21,7 +21,7 @@ A Manifest V3 browser extension that controls standard HTML5 video elements with
 - Decrease speed with `Shift + <` (`Shift + ,`); hold to keep decreasing.
 - Reset speed with `Shift + /`.
 - Jump directly to a configurable preferred speed with `Shift + "`.
-- Enable or disable individual shortcut actions, record custom keys, and configure speed range, step, target speed, hold speed, and hold delay.
+- Enable or disable individual shortcut actions, record custom keys, and configure speed range, step, target speed, hold speed, and hold delay. Global and per-site target speeds share the configured minimum but may exceed the step-adjustment maximum, up to 4×.
 - Use the popup for quick enable/disable controls, indicator visibility, language, and theme.
 - Configure per-site rules that can disable shortcuts or override the preferred speed and action hints.
 - Detect the interface language automatically, or choose English, Traditional Chinese, Simplified Chinese, Japanese, or Korean; choose System, Light, or Dark theme.

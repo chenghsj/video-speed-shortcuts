@@ -346,7 +346,6 @@ const App = () => {
                   <NumericField
                     {...TARGET_SPEED_FIELD}
                     min={settings.minimumSpeed}
-                    max={settings.maximumSpeed}
                     label={t(TARGET_SPEED_FIELD.label)}
                     value={draftNumbers.targetSpeed}
                     onChange={value => setNumberDraft('targetSpeed', value)}
@@ -459,7 +458,6 @@ const App = () => {
         <SiteRulesTable
           entries={settings.siteRules}
           minimumSpeed={settings.minimumSpeed}
-          maximumSpeed={settings.maximumSpeed}
           globalTargetSpeed={settings.targetSpeed}
           draft={siteRulesDraft}
           error={siteRulesError}

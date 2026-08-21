@@ -33,7 +33,7 @@ describe('settings editor workflow', () => {
     expect(cleared.state.draftNumbers.maximumSpeed).toBe(String(DEFAULT_SETTINGS.maximumSpeed))
   })
 
-  it('commits target speed within the current playback range', () => {
+  it('commits target speed above the step-adjustment maximum', () => {
     const state = createEditorState({
       ...DEFAULT_SETTINGS,
       minimumSpeed: 0.5,
@@ -44,8 +44,8 @@ describe('settings editor workflow', () => {
       { type: 'commit-number', id: 'targetSpeed' }
     )
 
-    expect(committed.state.settings.targetSpeed).toBe(2)
-    expect(committed.state.draftNumbers.targetSpeed).toBe('2')
+    expect(committed.state.settings.targetSpeed).toBe(3)
+    expect(committed.state.draftNumbers.targetSpeed).toBe('3')
   })
 
   it('keeps a conflicting shortcut in recording mode and saves a valid capture', () => {

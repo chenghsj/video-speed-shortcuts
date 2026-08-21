@@ -329,7 +329,7 @@ const App = () => {
                 label={t('targetSpeed')}
                 value={settings.targetSpeed}
                 min={settings.minimumSpeed}
-                max={settings.maximumSpeed}
+                max={NUMERIC_SETTING_CONSTRAINTS.targetSpeed.max}
                 step={NUMERIC_SETTING_CONSTRAINTS.targetSpeed.step}
                 onCommit={value => void updateSettings({ targetSpeed: value })}
               />

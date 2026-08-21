@@ -92,8 +92,7 @@ const isTheme = (value: unknown): value is Theme =>
 
 const normalizeSiteRules = (
   value: unknown,
-  minimumSpeed: number,
-  maximumSpeed: number
+  minimumSpeed: number
 ): VideoSpeedSettings['siteRules'] => {
   if (!Array.isArray(value)) return []
 
@@ -112,7 +111,11 @@ const normalizeSiteRules = (
 
     const targetSpeed = candidate.targetSpeed == null
       ? null
-      : roundSpeed(clamp(finiteOr(candidate.targetSpeed, minimumSpeed), minimumSpeed, maximumSpeed))
+      : roundSpeed(clamp(
+          finiteOr(candidate.targetSpeed, minimumSpeed),
+          minimumSpeed,
+          NUMERIC_SETTING_CONSTRAINTS.targetSpeed.max
+        ))
 
     return [{
       host,
@@ -157,7 +160,7 @@ export const normalizeSettings = (value: unknown): VideoSpeedSettings => {
       clamp(
         finiteOr(source.targetSpeed, DEFAULT_SETTINGS.targetSpeed),
         minimumSpeed,
-        Math.max(minimumSpeed, maximumSpeed)
+        NUMERIC_SETTING_CONSTRAINTS.targetSpeed.max
       )
     ),
     holdSpeed: normalizeNumericSetting(
@@ -194,8 +197,7 @@ export const normalizeSettings = (value: unknown): VideoSpeedSettings => {
     ) as VideoSpeedSettings['shortcutEnabled'],
     siteRules: normalizeSiteRules(
       source.siteRules ?? source.blacklist,
-      minimumSpeed,
-      Math.max(minimumSpeed, maximumSpeed)
+      minimumSpeed
     ),
   }
 }

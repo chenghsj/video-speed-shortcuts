@@ -29,6 +29,7 @@ export const HOLD_FIELDS = [
 export const TARGET_SPEED_FIELD = {
   id: 'targetSpeed',
   label: 'targetSpeed',
+  max: NUMERIC_SETTING_CONSTRAINTS.targetSpeed.max,
   step: NUMERIC_SETTING_CONSTRAINTS.targetSpeed.step,
 } as const
 

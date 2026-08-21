@@ -457,6 +457,7 @@ const App = () => {
 
       <main className={activeTab === 'sites' ? 'mt-3' : 'hidden'}>
         <SiteRulesTable
+          active={activeTab === 'sites'}
           entries={settings.siteRules}
           minimumSpeed={settings.minimumSpeed}
           globalTargetSpeed={settings.targetSpeed}

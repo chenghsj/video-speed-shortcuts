@@ -53,6 +53,7 @@ type SortKey = 'host' | 'status'
 type SortDirection = 'asc' | 'desc'
 
 type SiteRulesTableProps = {
+  active: boolean
   entries: SiteRule[]
   minimumSpeed: number
   globalTargetSpeed: number
@@ -199,6 +200,7 @@ export const getSelectedSiteRules = (
 }
 
 export const SiteRulesTable = ({
+  active,
   entries,
   minimumSpeed,
   globalTargetSpeed,
@@ -229,6 +231,14 @@ export const SiteRulesTable = ({
   useEffect(() => {
     setIsDeleteConfirming(false)
   }, [query, statusFilter])
+
+  useEffect(() => {
+    if (active) return
+    setIsEditing(false)
+    setIsBatchEditOpen(false)
+    setSelectedHosts(new Set())
+    setIsDeleteConfirming(false)
+  }, [active])
 
   useEffect(() => {
     if (entries.length > previousEntryCount.current) {

@@ -1,6 +1,6 @@
-import { CircleHelp, Gauge, Keyboard, Palette, Pencil, RotateCcw } from 'lucide-react'
+import { CircleHelp, Gauge, Keyboard, Palette, Pencil, RotateCcw, Star } from 'lucide-react'
 import { createRoot } from 'react-dom/client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { GitHubIcon } from '../components/github-icon'
 import { KeyboardShortcut } from '../components/keyboard-shortcut'
 import { ScrubbableLabel } from '../components/scrubbable-label'
@@ -14,6 +14,7 @@ import { Separator } from '../components/ui/separator'
 import { Switch } from '../components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
+import { EXTERNAL_LINKS, getRatingUrl } from '../shared/external-links'
 import type { TranslationKey } from '../shared/i18n'
 import { SHORTCUT_ACTIONS, type Locale, type ShortcutAction, type Theme } from '../shared/types'
 import { useLocalizedAppearance } from '../shared/use-localized-appearance'
@@ -25,7 +26,6 @@ import '../styles.css'
 
 document.body.className = 'options-page'
 
-const GITHUB_REPOSITORY_URL = 'https://github.com/chenghsj/video-speed-shortcuts'
 type OptionsTab = 'general' | 'sites'
 
 const getInitialTab = (): OptionsTab => window.location.hash === '#sites' ? 'sites' : 'general'
@@ -101,14 +101,16 @@ const NumericField = ({
 )
 
 const AppearanceField = ({
+  id,
   label,
   children,
 }: {
+  id: string
   label: string
   children: React.ReactNode
 }) => (
   <div className="space-y-1.5">
-    <p className="text-sm font-medium">{label}</p>
+    <p id={id} className="text-sm font-medium">{label}</p>
     {children}
   </div>
 )
@@ -149,6 +151,10 @@ const App = () => {
     replaceSettings,
   } = useSettingsEditor()
   const [activeTab, setActiveTab] = useState<OptionsTab>(getInitialTab)
+  const tabRefs = useRef<Record<OptionsTab, HTMLButtonElement | null>>({
+    general: null,
+    sites: null,
+  })
 
   const selectTab = (tab: OptionsTab): void => {
     setActiveTab(tab)
@@ -165,7 +171,7 @@ const App = () => {
   )
 
   if (isLoading) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">{t('loading')}</div>
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground" role="status" aria-live="polite">{t('loading')}</div>
   }
 
   return (
@@ -177,16 +183,28 @@ const App = () => {
             <h1 className="text-xl font-semibold tracking-tight">{t('appName')}</h1>
           </div>
         </div>
-        <a
-          href={GITHUB_REPOSITORY_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          aria-label="GitHub repository"
-        >
-          <GitHubIcon className="size-4" />
-          GitHub
-        </a>
+        <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={EXTERNAL_LINKS.githubRepository}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            aria-label={t('githubRepositoryAriaLabel')}
+          >
+            <GitHubIcon className="size-4" />
+            {t('githubRepository')}
+          </a>
+          <a
+            href={getRatingUrl()}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            aria-label={t('rateExtensionAriaLabel')}
+          >
+            <Star aria-hidden="true" className="size-4" />
+            {t('rateExtension')}
+          </a>
+        </div>
       </header>
 
       <nav
@@ -197,22 +215,49 @@ const App = () => {
         {(['general', 'sites'] as const).map(tab => (
           <button
             key={tab}
+            ref={element => { tabRefs.current[tab] = element }}
+            id={`${tab}-tab`}
             type="button"
             role="tab"
             aria-selected={activeTab === tab}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+            aria-controls={`${tab}-panel`}
+            tabIndex={activeTab === tab ? 0 : -1}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
               activeTab === tab
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
             onClick={() => selectTab(tab)}
+            onKeyDown={event => {
+              const tabs: OptionsTab[] = ['general', 'sites']
+              const currentIndex = tabs.indexOf(tab)
+              const nextTab = event.key === 'ArrowRight'
+                ? tabs[(currentIndex + 1) % tabs.length]
+                : event.key === 'ArrowLeft'
+                  ? tabs[(currentIndex - 1 + tabs.length) % tabs.length]
+                  : event.key === 'Home'
+                    ? tabs[0]
+                    : event.key === 'End'
+                      ? tabs[tabs.length - 1]
+                      : null
+              if (!nextTab) return
+              event.preventDefault()
+              selectTab(nextTab)
+              tabRefs.current[nextTab]?.focus()
+            }}
           >
             {t(tab === 'general' ? 'generalSettings' : 'sites')}
           </button>
         ))}
       </nav>
 
-      <main className={`${activeTab === 'general' ? 'grid' : 'hidden'} mt-3 gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(18rem,3fr)] lg:items-start`}>
+      <main
+        id="general-panel"
+        role="tabpanel"
+        aria-labelledby="general-tab"
+        hidden={activeTab !== 'general'}
+        className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(18rem,3fr)] lg:items-start"
+      >
         <div className="grid min-w-0 content-start gap-3">
           <Card className="bg-card/85 backdrop-blur-xl">
             <CardHeader className="p-4 pb-2">
@@ -419,9 +464,9 @@ const App = () => {
               </div>
             </CardHeader>
             <CardContent className="grid gap-4 p-4 pt-0">
-              <AppearanceField label={t('language')}>
+              <AppearanceField id="options-language-label" label={t('language')}>
                 <Select value={settings.locale} onValueChange={value => patchSettings({ locale: value as Locale })}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-9" aria-labelledby="options-language-label">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -433,9 +478,9 @@ const App = () => {
                   </SelectContent>
                 </Select>
               </AppearanceField>
-              <AppearanceField label={t('theme')}>
+              <AppearanceField id="options-theme-label" label={t('theme')}>
                 <Select value={settings.theme} onValueChange={value => patchSettings({ theme: value as Theme })}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-9" aria-labelledby="options-theme-label">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -455,7 +500,13 @@ const App = () => {
 
       </main>
 
-      <main className={activeTab === 'sites' ? 'mt-3' : 'hidden'}>
+      <main
+        id="sites-panel"
+        role="tabpanel"
+        aria-labelledby="sites-tab"
+        hidden={activeTab !== 'sites'}
+        className="mt-3"
+      >
         <SiteRulesTable
           active={activeTab === 'sites'}
           entries={settings.siteRules}
@@ -475,7 +526,7 @@ const App = () => {
 
       {statusKey === 'saveFailed' && (
         <footer className="flex justify-end px-1 py-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-2" aria-live="polite">
+          <span className="flex items-center gap-2" role="alert">
             {t(statusKey)}
           </span>
         </footer>

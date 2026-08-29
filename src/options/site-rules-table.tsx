@@ -452,7 +452,7 @@ export const SiteRulesTable = ({
               </Select>
             </div>
             <div className="flex items-center justify-between gap-3 sm:justify-end">
-              <span className="text-xs tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite" aria-atomic="true">
                 {isEditing && selectedCount > 0
                   ? t('selectedSitesCount', { count: selectedCount })
                   : t('siteRulesCount', { shown: filteredEntries.length, total: entries.length })}

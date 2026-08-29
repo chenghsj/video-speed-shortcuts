@@ -156,6 +156,7 @@ export const SettingsTransfer = ({ settings, t, onImport }: SettingsTransferProp
             type="file"
             accept="application/json,.json"
             className="hidden"
+            aria-label={t('importSettings')}
             onChange={event => void selectBackup(event)}
           />
           {statusKey ? (
@@ -227,7 +228,7 @@ export const SettingsTransfer = ({ settings, t, onImport }: SettingsTransferProp
             </dl>
           ) : null}
           {dialogErrorKey ? (
-            <p className="text-sm text-destructive" aria-live="polite">{t(dialogErrorKey)}</p>
+            <p className="text-sm text-destructive" role="alert">{t(dialogErrorKey)}</p>
           ) : null}
           <DialogFooter>
             <Button variant="outline" disabled={isImporting} onClick={closePreview}>

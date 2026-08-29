@@ -1,6 +1,7 @@
-import { Check, CircleOff, Gauge, Keyboard, Loader2, Palette, RotateCcw, Settings2 } from 'lucide-react'
+import { Check, CircleOff, Gauge, Keyboard, Loader2, Palette, RotateCcw, Settings2, Star } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { GitHubIcon } from '../components/github-icon'
 import { KeyboardShortcut } from '../components/keyboard-shortcut'
 import { ScrubbableLabel } from '../components/scrubbable-label'
 import { Badge } from '../components/ui/badge'
@@ -8,10 +9,10 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Separator } from '../components/ui/separator'
 import { Switch } from '../components/ui/switch'
 import type { TranslationKey } from '../shared/i18n'
+import { EXTERNAL_LINKS, getRatingUrl } from '../shared/external-links'
 import { NUMERIC_SETTING_CONSTRAINTS, resolveNumericDraft } from '../shared/numeric-settings'
 import { isSiteBlocked } from '../shared/site-matching'
 import { useSettings } from '../shared/use-settings'
@@ -24,6 +25,7 @@ import {
   undoBlockedSite,
   type BlockSiteUndo,
 } from './current-site'
+import { PopupSelect } from './popup-select'
 import '../styles.css'
 
 document.body.className = 'popup-page'
@@ -170,7 +172,7 @@ const App = () => {
   }
 
   if (isLoading) {
-    return <div className="grid min-h-[420px] place-items-center text-sm text-muted-foreground">{t('loading')}</div>
+    return <div className="grid min-h-[420px] place-items-center text-sm text-muted-foreground" role="status" aria-live="polite">{t('loading')}</div>
   }
 
   return (
@@ -378,38 +380,49 @@ const App = () => {
         <CardContent className="space-y-2.5 p-2.5 pt-0">
           <div className="grid grid-cols-2 gap-1.5">
             <div className="space-y-1">
-              <div className="text-[11px] font-medium text-muted-foreground">{t('language')}</div>
-              <Select value={settings.locale} onValueChange={value => void updateSettings({ locale: value as Locale })}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {localeOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div id="popup-language-label" className="text-[11px] font-medium text-muted-foreground">{t('language')}</div>
+              <PopupSelect
+                ariaLabelledBy="popup-language-label"
+                value={settings.locale}
+                options={localeOptions}
+                onValueChange={value => void updateSettings({ locale: value as Locale })}
+              />
             </div>
             <div className="space-y-1">
-              <div className="text-[11px] font-medium text-muted-foreground">{t('theme')}</div>
-              <Select value={settings.theme} onValueChange={value => void updateSettings({ theme: value as Theme })}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {themeOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div id="popup-theme-label" className="text-[11px] font-medium text-muted-foreground">{t('theme')}</div>
+              <PopupSelect
+                ariaLabelledBy="popup-theme-label"
+                value={settings.theme}
+                options={themeOptions}
+                onValueChange={value => void updateSettings({ theme: value as Theme })}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <footer className="mt-2 grid grid-cols-2 gap-1.5 border-t px-1 pt-2">
+        <a
+          href={EXTERNAL_LINKS.githubRepository}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t('githubRepositoryAriaLabel')}
+          className="inline-flex h-8 min-w-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-2.5 text-xs font-semibold shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <GitHubIcon className="size-3.5 shrink-0" />
+          <span className="truncate">{t('githubRepository')}</span>
+        </a>
+        <a
+          href={getRatingUrl()}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t('rateExtensionAriaLabel')}
+          className="inline-flex h-8 min-w-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-2.5 text-xs font-semibold shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Star aria-hidden="true" className="size-3.5 shrink-0" />
+          <span className="truncate">{t('rateExtension')}</span>
+        </a>
+      </footer>
 
     </div>
   )

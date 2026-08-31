@@ -37,4 +37,14 @@ describe('i18n', () => {
     expect(translate(locale, 'language')).not.toBe('Language')
     expect(translate(locale, key)).toBe(label)
   })
+
+  it.each([
+    ['zh-TW', '提高速度'],
+    ['en', 'Increase speed'],
+    ['zh-CN', '提高速度'],
+    ['ja', '速度を上げる'],
+    ['ko', '속도 높이기'],
+  ] as const)('identifies the shortcut action in the %s recorder description', (locale, action) => {
+    expect(translate(locale, 'recordShortcutDescription', { action })).toContain(action)
+  })
 })

@@ -21,6 +21,7 @@ import { useLocalizedAppearance } from '../shared/use-localized-appearance'
 import { SiteRulesTable } from './site-rules-table'
 import { HOLD_FIELDS, NUMBER_FIELDS, TARGET_SPEED_FIELD } from './editor'
 import { SettingsTransfer } from './settings-transfer'
+import { ShortcutRecorderDialog } from './shortcut-recorder-dialog'
 import { useSettingsEditor } from './use-settings-editor'
 import '../styles.css'
 
@@ -132,12 +133,19 @@ const App = () => {
     settings,
     isLoading,
     recordingAction,
+    recordingDraft,
+    recordingSaveFailed,
     shortcutConflict,
     statusKey,
     siteRulesDraft,
     siteRulesError,
     draftNumbers,
     startRecording,
+    captureRecording,
+    cancelRecording,
+    restoreRecording,
+    saveRecording,
+    resetShortcut,
     setNumberDraft,
     commitNumber,
     setSiteRulesDraft,
@@ -278,12 +286,13 @@ const App = () => {
                         <TableHead className="pl-4">{t('actions')}</TableHead>
                         <TableHead className="w-24 text-center">{t('shortcutEnabled')}</TableHead>
                         <TableHead className="w-40">{t('shortcutKey')}</TableHead>
-                        <TableHead className="w-12"><span className="sr-only">{t('edit')}</span></TableHead>
+                        <TableHead className="w-20">
+                          <span className="sr-only">{t('edit')}</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {SHORTCUT_ACTIONS.map(action => {
-                        const recording = recordingAction === action
                         return (
                           <TableRow key={action}>
                             <TableCell className="pl-4 font-medium">
@@ -316,29 +325,34 @@ const App = () => {
                               />
                             </TableCell>
                             <TableCell>
-                              {recording ? (
-                                <span className="inline-flex h-6 items-center rounded-full bg-primary px-2 text-[11px] font-medium text-primary-foreground">
-                                  {t('recording')}
-                                </span>
-                              ) : (
-                                <KeyboardShortcut
-                                  binding={settings.bindings[action]}
-                                  keyClassName="h-6 min-w-6 px-2 text-xs"
-                                />
-                              )}
+                              <KeyboardShortcut
+                                binding={settings.bindings[action]}
+                                keyClassName="h-6 min-w-6 px-2 text-xs"
+                              />
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-8 shrink-0 rounded-md text-muted-foreground"
-                                disabled={recording}
-                                onClick={() => startRecording(action)}
-                                aria-label={`${t('recordShortcut')}: ${t(ACTION_TITLE[action])}`}
-                                title={t('recordShortcut')}
-                              >
-                                <Pencil aria-hidden="true" className="size-3.5" />
-                              </Button>
+                              <div className="flex items-center justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8 shrink-0 rounded-md text-muted-foreground"
+                                  onClick={() => startRecording(action)}
+                                  aria-label={`${t('recordShortcut')}: ${t(ACTION_TITLE[action])}`}
+                                  title={t('recordShortcut')}
+                                >
+                                  <Pencil aria-hidden="true" className="size-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8 shrink-0 rounded-md text-muted-foreground"
+                                  onClick={() => resetShortcut(action)}
+                                  aria-label={`${t('reset')}: ${t(ACTION_TITLE[action])}`}
+                                  title={t('reset')}
+                                >
+                                  <RotateCcw aria-hidden="true" className="size-3.5" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )
@@ -347,13 +361,6 @@ const App = () => {
                   </Table>
                 </div>
               </TooltipProvider>
-              {shortcutConflict || recordingAction ? (
-                <p className="mt-2 text-xs text-destructive" aria-live="polite">
-                  {shortcutConflict
-                    ? t('shortcutConflict', { action: t(ACTION_TITLE[shortcutConflict]) })
-                    : t('recordingHint')}
-                </p>
-              ) : null}
             </CardContent>
           </Card>
 
@@ -523,6 +530,20 @@ const App = () => {
           onRemove={removeSiteRules}
         />
       </main>
+
+      <ShortcutRecorderDialog
+        action={recordingAction}
+        actionTitle={recordingAction ? t(ACTION_TITLE[recordingAction]) : ''}
+        savedBinding={recordingAction ? settings.bindings[recordingAction] : null}
+        draft={recordingDraft}
+        conflictTitle={shortcutConflict ? t(ACTION_TITLE[shortcutConflict]) : null}
+        saveFailed={recordingSaveFailed}
+        t={t}
+        onCapture={captureRecording}
+        onCancel={cancelRecording}
+        onRestore={restoreRecording}
+        onSave={saveRecording}
+      />
 
       {statusKey === 'saveFailed' && (
         <footer className="flex justify-end px-1 py-3 text-xs text-muted-foreground">

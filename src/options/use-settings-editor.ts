@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isModifierOnly } from '../shared/keys'
 import { useSettings } from '../shared/use-settings'
-import type { SiteRule, ShortcutAction, VideoSpeedSettings } from '../shared/types'
+import type { KeyBinding, SiteRule, ShortcutAction, VideoSpeedSettings } from '../shared/types'
 import {
-  bindingFromKeyboardEvent,
   createEditorState,
   reduceEditor,
   type EditorEvent,
@@ -27,9 +25,10 @@ export const useSettingsEditor = () => {
         dispatchRef.current?.({
           type: 'save-succeeded',
           siteRulesDraft: effect.siteRulesDraft,
+          recording: effect.recording,
         })
       } catch {
-        dispatchRef.current?.({ type: 'save-failed' })
+        dispatchRef.current?.({ type: 'save-failed', recording: effect.recording })
       }
     },
     [updateSettings]
@@ -64,34 +63,23 @@ export const useSettingsEditor = () => {
     dispatch({ type: 'settings-changed', settings: storedSettings })
   }, [dispatch, storedSettings])
 
-  useEffect(() => {
-    if (!editor.recordingAction) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      if (event.key === 'Escape') {
-        dispatch({ type: 'cancel-recording' })
-        return
-      }
-      if (isModifierOnly(event)) return
-      dispatch({ type: 'capture-binding', binding: bindingFromKeyboardEvent(event) })
-    }
-
-    window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [dispatch, editor.recordingAction])
-
   return {
     settings: editor.settings,
     isLoading,
     recordingAction: editor.recordingAction,
+    recordingDraft: editor.recordingDraft,
+    recordingSaveFailed: editor.recordingSaveFailed,
     shortcutConflict: editor.shortcutConflict,
     statusKey: editor.statusKey,
     siteRulesDraft: editor.siteRulesDraft,
     siteRulesError: editor.siteRulesError,
     draftNumbers: editor.draftNumbers,
     startRecording: (action: ShortcutAction) => dispatch({ type: 'start-recording', action }),
+    captureRecording: (binding: KeyBinding) => dispatch({ type: 'capture-binding', binding }),
+    cancelRecording: () => dispatch({ type: 'cancel-recording' }),
+    restoreRecording: () => dispatch({ type: 'restore-recording' }),
+    saveRecording: () => dispatch({ type: 'save-recording' }),
+    resetShortcut: (action: ShortcutAction) => dispatch({ type: 'reset-shortcut', action }),
     setNumberDraft: (id: NumberFieldId, value: string) =>
       dispatch({ type: 'set-number-draft', id, value }),
     commitNumber: (id: NumberFieldId) => dispatch({ type: 'commit-number', id }),

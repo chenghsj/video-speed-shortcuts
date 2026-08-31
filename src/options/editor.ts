@@ -1,4 +1,4 @@
-import { bindingFromEvent, bindingsEqual } from '../shared/keys'
+import { bindingsEqual } from '../shared/keys'
 import { NUMERIC_SETTING_CONSTRAINTS } from '../shared/numeric-settings'
 import { DEFAULT_SETTINGS, normalizeSettings } from '../shared/settings'
 import { normalizeHostname } from '../shared/site-matching'
@@ -42,10 +42,16 @@ export type EditorErrorKey = 'invalid' | 'duplicate'
 export type EditorSiteRuleError = { key: EditorErrorKey; line: number }
 export type NewSiteRule = Omit<SiteRule, 'host'>
 export type EditorSection = 'quickControls' | 'shortcuts' | 'appearance'
+type RecordingSaveAttempt = { action: ShortcutAction; binding: KeyBinding; revision: number }
 
 export type EditorState = {
   settings: VideoSpeedSettings
   recordingAction: ShortcutAction | null
+  recordingDraft: KeyBinding | null
+  recordingDraftDirty: boolean
+  recordingRestoresEnabled: boolean
+  recordingRevision: number
+  recordingSaveFailed: boolean
   shortcutConflict: ShortcutAction | null
   statusKey: EditorStatusKey
   siteRulesDraft: string
@@ -61,14 +67,24 @@ export type EditorEvent =
   | { type: 'start-recording'; action: ShortcutAction }
   | { type: 'cancel-recording' }
   | { type: 'capture-binding'; binding: KeyBinding | null }
+  | { type: 'restore-recording' }
+  | { type: 'save-recording' }
+  | { type: 'reset-shortcut'; action: ShortcutAction }
   | { type: 'set-site-rules-draft'; value: string }
   | { type: 'add-site-rules'; rule?: NewSiteRule }
   | { type: 'toggle-site-rule'; host: string; enabled: boolean }
   | { type: 'patch-site-rule'; host: string; changes: Partial<Omit<SiteRule, 'host'>> }
   | { type: 'patch-site-rules'; hosts: string[]; changes: Partial<Omit<SiteRule, 'host'>> }
   | { type: 'remove-site-rules'; hosts: string[] }
-  | { type: 'save-succeeded'; siteRulesDraft?: string }
-  | { type: 'save-failed' }
+  | {
+      type: 'save-succeeded'
+      siteRulesDraft?: string
+      recording?: RecordingSaveAttempt
+    }
+  | {
+      type: 'save-failed'
+      recording?: RecordingSaveAttempt
+    }
   | { type: 'replace-settings-succeeded'; settings: VideoSpeedSettings }
   | { type: 'reset-section'; section: EditorSection }
 
@@ -76,6 +92,7 @@ export type EditorEffect = {
   type: 'save'
   settings: VideoSpeedSettings
   siteRulesDraft?: string
+  recording?: RecordingSaveAttempt
 }
 
 export type EditorTransition = {
@@ -95,6 +112,11 @@ const draftNumbersFor = (settings: VideoSpeedSettings): Record<NumberFieldId, st
 export const createEditorState = (settings: VideoSpeedSettings = DEFAULT_SETTINGS): EditorState => ({
   settings,
   recordingAction: null,
+  recordingDraft: null,
+  recordingDraftDirty: false,
+  recordingRestoresEnabled: false,
+  recordingRevision: 0,
+  recordingSaveFailed: false,
   shortcutConflict: null,
   statusKey: 'autoSave',
   siteRulesDraft: '',
@@ -113,10 +135,59 @@ const save = (state: EditorState, settings: VideoSpeedSettings): EditorTransitio
   effect: { type: 'save', settings },
 })
 
+const findShortcutConflict = (
+  settings: VideoSpeedSettings,
+  action: ShortcutAction,
+  binding: KeyBinding
+): ShortcutAction | null =>
+  SHORTCUT_ACTIONS.find(
+    candidate => candidate !== action && bindingsEqual(settings.bindings[candidate], binding)
+  ) ?? null
+
+const clearRecordingState = (state: EditorState): EditorState => ({
+  ...state,
+  recordingAction: null,
+  recordingDraft: null,
+  recordingDraftDirty: false,
+  recordingRestoresEnabled: false,
+  recordingRevision: state.recordingRevision + 1,
+  recordingSaveFailed: false,
+  shortcutConflict: null,
+})
+
+const matchesRecordingSaveAttempt = (
+  state: EditorState,
+  attempt: RecordingSaveAttempt | undefined
+): boolean =>
+  Boolean(
+    attempt &&
+      state.recordingAction === attempt.action &&
+      state.recordingDraft &&
+      bindingsEqual(state.recordingDraft, attempt.binding) &&
+      state.recordingRevision === attempt.revision
+  )
+
 export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTransition => {
   switch (event.type) {
-    case 'settings-changed':
-      return { state: withSettings(state, event.settings) }
+    case 'settings-changed': {
+      const recordingDraft =
+        state.recordingAction &&
+        state.recordingDraft &&
+        !state.recordingDraftDirty
+          ? structuredClone(event.settings.bindings[state.recordingAction])
+          : state.recordingDraft
+      const shortcutConflict =
+        state.recordingAction && recordingDraft
+          ? findShortcutConflict(event.settings, state.recordingAction, recordingDraft)
+          : null
+      return {
+        state: {
+          ...withSettings(state, event.settings),
+          recordingDraft,
+          shortcutConflict,
+        },
+      }
+    }
     case 'patch-settings':
       return save(state, { ...state.settings, ...event.changes })
     case 'set-number-draft':
@@ -144,27 +215,118 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
         state: {
           ...state,
           recordingAction: event.action,
+          recordingDraft: structuredClone(state.settings.bindings[event.action]),
+          recordingDraftDirty: false,
+          recordingRestoresEnabled: false,
+          recordingRevision: state.recordingRevision + 1,
+          recordingSaveFailed: false,
           shortcutConflict: null,
         },
       }
     case 'cancel-recording':
-      return { state: { ...state, recordingAction: null, shortcutConflict: null } }
+      return { state: clearRecordingState(state) }
     case 'capture-binding': {
       if (!state.recordingAction || !event.binding) return { state }
-      const conflict = SHORTCUT_ACTIONS.find(
-        action =>
-          action !== state.recordingAction &&
-          bindingsEqual(state.settings.bindings[action], event.binding as KeyBinding)
+      const conflict = findShortcutConflict(state.settings, state.recordingAction, event.binding)
+      return {
+        state: {
+          ...state,
+          recordingDraft: event.binding,
+          recordingDraftDirty: true,
+          recordingRevision: state.recordingRevision + 1,
+          recordingSaveFailed: false,
+          shortcutConflict: conflict,
+        },
+      }
+    }
+    case 'restore-recording':
+      if (!state.recordingAction) return { state }
+      return {
+        state: {
+          ...state,
+          recordingDraft: structuredClone(state.settings.bindings[state.recordingAction]),
+          recordingDraftDirty: false,
+          recordingRestoresEnabled: false,
+          recordingRevision: state.recordingRevision + 1,
+          recordingSaveFailed: false,
+          shortcutConflict: null,
+        },
+      }
+    case 'save-recording': {
+      if (!state.recordingAction || !state.recordingDraft) {
+        return { state }
+      }
+      const conflict = findShortcutConflict(
+        state.settings,
+        state.recordingAction,
+        state.recordingDraft
       )
-      if (conflict) return { state: { ...state, shortcutConflict: conflict } }
-
-      return save(
-        { ...state, recordingAction: null, shortcutConflict: null },
+      if (conflict) {
+        if (conflict === state.shortcutConflict) return { state }
+        return {
+          state: {
+            ...state,
+            shortcutConflict: conflict,
+          },
+        }
+      }
+      const transition = save(
+        { ...state, recordingSaveFailed: false },
         {
-        ...state.settings,
-        bindings: { ...state.settings.bindings, [state.recordingAction]: event.binding },
+          ...state.settings,
+          bindings: {
+            ...state.settings.bindings,
+            [state.recordingAction]: state.recordingDraft,
+          },
+          shortcutEnabled: state.recordingRestoresEnabled
+            ? {
+                ...state.settings.shortcutEnabled,
+                [state.recordingAction]: DEFAULT_SETTINGS.shortcutEnabled[state.recordingAction],
+              }
+            : state.settings.shortcutEnabled,
         }
       )
+      return {
+        ...transition,
+        effect: {
+          type: 'save',
+          settings: transition.state.settings,
+          recording: {
+            action: state.recordingAction,
+            binding: state.recordingDraft,
+            revision: state.recordingRevision,
+          },
+        },
+      }
+    }
+    case 'reset-shortcut': {
+      const defaultBinding = DEFAULT_SETTINGS.bindings[event.action]
+      const conflict = findShortcutConflict(state.settings, event.action, defaultBinding)
+      if (conflict) {
+        return {
+          state: {
+            ...state,
+            recordingAction: event.action,
+            recordingDraft: structuredClone(defaultBinding),
+            recordingDraftDirty: true,
+            recordingRestoresEnabled: true,
+            recordingRevision: state.recordingRevision + 1,
+            recordingSaveFailed: false,
+            shortcutConflict: conflict,
+          },
+        }
+      }
+      return save(state, {
+        ...state.settings,
+        bindings: {
+          ...state.settings.bindings,
+          [event.action]: structuredClone(defaultBinding),
+        },
+        shortcutEnabled: {
+          ...state.settings.shortcutEnabled,
+          [event.action]: DEFAULT_SETTINGS.shortcutEnabled[event.action],
+        },
+      })
     }
     case 'set-site-rules-draft':
       return {
@@ -270,10 +432,13 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
           siteRules: state.settings.siteRules.filter(entry => !hosts.has(entry.host)),
         })
       }
-    case 'save-succeeded':
+    case 'save-succeeded': {
+      const nextState = matchesRecordingSaveAttempt(state, event.recording)
+        ? clearRecordingState(state)
+        : state
       return {
         state: {
-          ...state,
+          ...nextState,
           statusKey: 'autoSave',
           siteRulesDraft:
             event.siteRulesDraft !== undefined && state.siteRulesDraft === event.siteRulesDraft
@@ -281,14 +446,21 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
               : state.siteRulesDraft,
         },
       }
-    case 'save-failed':
-      return { state: { ...state, statusKey: 'saveFailed' } }
+    }
+    case 'save-failed': {
+      const recordingSaveFailed = matchesRecordingSaveAttempt(state, event.recording)
+      return {
+        state: {
+          ...state,
+          recordingSaveFailed: recordingSaveFailed || state.recordingSaveFailed,
+          statusKey: 'saveFailed',
+        },
+      }
+    }
     case 'replace-settings-succeeded':
       return {
         state: {
-          ...withSettings(state, event.settings),
-          recordingAction: null,
-          shortcutConflict: null,
+          ...clearRecordingState(withSettings(state, event.settings)),
           statusKey: 'autoSave',
           siteRulesDraft: '',
           siteRulesError: null,
@@ -308,7 +480,7 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
           })
         case 'shortcuts':
           return save(
-            { ...state, recordingAction: null, shortcutConflict: null },
+            clearRecordingState(state),
             {
               ...state.settings,
               bindings: structuredClone(DEFAULT_SETTINGS.bindings),
@@ -325,5 +497,3 @@ export const reduceEditor = (state: EditorState, event: EditorEvent): EditorTran
     }
   }
 }
-
-export const bindingFromKeyboardEvent = (event: KeyboardEvent): KeyBinding => bindingFromEvent(event)

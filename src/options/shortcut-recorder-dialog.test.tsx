@@ -114,7 +114,11 @@ describe('ShortcutRecorderDialog', () => {
       'recordShortcutDescription'
     )
     const dialog = document.querySelector<HTMLElement>('[data-slot="dialog-content"]')
+    const overlay = document.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')
     expect(document.activeElement).toBe(capture)
+    expect(dialog?.classList).toContain('duration-100')
+    expect(dialog?.classList).not.toContain('duration-200')
+    expect(overlay?.classList).toContain('duration-100')
     expect(dialog?.getAttribute('aria-describedby')).toBe(capture?.getAttribute('aria-describedby'))
     expect(document.getElementById(dialog?.getAttribute('aria-describedby') ?? '')).not.toBeNull()
     act(() => capture?.dispatchEvent(event))

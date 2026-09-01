@@ -59,8 +59,8 @@ export const ShortcutRecorderDialog = ({
     >
       <DialogContent
         aria-describedby={descriptionId}
-        className="rounded-xl border-0 bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 shadow-none sm:max-w-sm"
-        overlayClassName="isolate bg-black/10 supports-backdrop-filter:backdrop-blur-xs"
+        className="rounded-xl border-0 bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 shadow-none duration-100 sm:max-w-sm"
+        overlayClassName="isolate bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs"
         closeButtonClassName="top-2 right-2 inline-flex size-7 items-center justify-center rounded-md opacity-100 hover:bg-muted hover:text-foreground focus:ring-3 focus:ring-ring/50 focus:ring-offset-0"
         onOpenAutoFocus={event => {
           event.preventDefault()

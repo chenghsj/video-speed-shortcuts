@@ -38,7 +38,7 @@ npm test
 npm run build
 ```
 
-`npm run build` creates the Chromium build in `dist/chromium`.
+`npm run build` creates the Chromium and Firefox builds in `dist/chromium` and `dist/firefox`.
 
 ### Load an unpacked build
 
@@ -48,13 +48,9 @@ For Chromium:
 2. Enable Developer mode.
 3. Select **Load unpacked** and choose `dist/chromium`.
 
-For Firefox:
+For Firefox, open `about:debugging#/runtime/this-firefox`, select **Load Temporary Add-on**, and choose `dist/firefox/manifest.json`.
 
-```sh
-npm run build:firefox
-```
-
-Then open `about:debugging#/runtime/this-firefox`, select **Load Temporary Add-on**, and choose `dist/firefox/manifest.json`.
+To rebuild only one browser target, run `npm run build:chromium` or `npm run build:firefox`.
 
 ## Release builds
 
@@ -76,20 +72,31 @@ The installable ZIP files contain `manifest.json` at their archive root and can 
 
 ### Publish a release
 
-Create a non-empty, version-specific release notes file first, for example:
-
-```text
-.github/release-notes/v0.1.1.md
-```
-
-Then update the version and create the matching Git tag:
+Start from a clean worktree. Set the intended version without creating a commit or tag:
 
 ```sh
-npm version 0.1.1
+npm version 0.3.4 --no-git-tag-version
+```
+
+Then create a non-empty, version-specific release notes file, for example:
+
+```text
+.github/release-notes/v0.3.4.md
+```
+
+Run the local release checks, commit the version metadata and release notes, create the matching annotated tag, and push both:
+
+```sh
+npm test
+npm run build:release
+git diff --check
+git add package.json package-lock.json .github/release-notes/v0.3.4.md
+git commit -m "Release 0.3.4"
+git tag -a v0.3.4 -m "Video Speed Shortcuts 0.3.4"
 git push origin HEAD --follow-tags
 ```
 
-Replace `0.1.1` with the intended version. A tag such as `v0.1.1` must match the version in `package.json`, and `.github/release-notes/v0.1.1.md` must exist and contain the release description. Pushing the tag runs tests, typechecking, browser-specific manifest validation, Firefox `web-ext` linting, and packaging. The workflow fails instead of publishing an undocumented release when the notes file is missing or empty. It then creates a GitHub Release containing:
+Replace `0.3.4` with the intended version. A tag such as `v0.3.4` must match the version in `package.json`, and `.github/release-notes/v0.3.4.md` must exist and contain the release description. Pushing the tag runs tests, typechecking, browser-specific manifest validation, Firefox `web-ext` linting, and packaging. The workflow fails instead of publishing an undocumented release when the notes file is missing or empty. It then creates a GitHub Release containing:
 
 - `video-speed-shortcuts-<version>-chromium.zip`
 - `video-speed-shortcuts-<version>-firefox.zip`

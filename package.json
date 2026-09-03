@@ -14,10 +14,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run typecheck && npm run build:chromium",
+    "build": "npm run typecheck && npm run build:chromium && npm run build:firefox",
     "build:chromium": "vite build --mode chromium --outDir dist/chromium",
     "build:firefox": "vite build --mode firefox --outDir dist/firefox",
-    "build:release": "npm run typecheck && npm run build:chromium && npm run build:firefox",
+    "build:release": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
